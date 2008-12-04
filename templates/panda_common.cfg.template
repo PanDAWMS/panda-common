@@ -1,0 +1,5 @@
+[logger]
+loghost=gridui05.usatlas.bnl.gov
+monport-apache=25880
+monurlprefix=/logger/logger/query
+logdir=@@install_dir@@/var/log/panda
