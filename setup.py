@@ -81,7 +81,7 @@ setup(
               ],
     data_files=[ 
                 ('etc/panda',  
-                 ['templates/panda_common.cfg.template']
+                 ['templates/panda_common.cfg.rpmnew.template']
                  ),
                 ],
     cmdclass={'install_data': install_data_panda}
