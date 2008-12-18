@@ -7,7 +7,15 @@ release_version='0.0.1'
 
 import re
 from distutils.core import setup
+from distutils.command.install import install as install_org
 from distutils.command.install_data import install_data as install_data_org
+
+# set overall prefix for bdist_rpm
+class install_panda(install_org):
+    def initialize_options (self):
+        install_org.initialize_options(self)
+        self.prefix = '/data/atlpan/panda'
+                    
 
 # generates files using templates and install them
 class install_data_panda (install_data_org):
@@ -84,5 +92,6 @@ setup(
                  ['templates/panda_common.cfg.rpmnew.template']
                  ),
                 ],
-    cmdclass={'install_data': install_data_panda}
+    cmdclass={'install': install_panda,
+              'install_data': install_data_panda}
 )
