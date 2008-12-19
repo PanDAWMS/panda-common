@@ -6,5 +6,4 @@ Project Dependencies
 -- Need to have database set up and on.
 
 Typical System Dependencies
---MySQLdb   ( MySQL-python RPM on RHEL 4 )
 -- python-curl
