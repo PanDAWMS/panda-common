@@ -7,7 +7,7 @@ Includes all libraries used by both server and monitor (and others).
 --executor interface
 --interfaces to ATLAS Production database
 
-
+minor edit to test svn --jrh
 Release Note
 ------------
 
