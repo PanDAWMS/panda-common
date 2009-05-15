@@ -7,9 +7,11 @@ Includes all libraries used by both server and monitor (and others).
 --executor interface
 --interfaces to ATLAS Production database
 
-minor edit to test svn --jrh
 Release Note
 ------------
+
+* 0.0.4 5/15/2009
+  * changed default port for logger
 
 * 0.0.3 12/19/2008
   * adjustments for CERN
