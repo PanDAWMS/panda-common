@@ -3,7 +3,7 @@
 # Setup prog for Panda Common
 #
 #
-release_version='0.0.3'
+release_version='0.0.5'
 
 import re
 from distutils.core import setup
