@@ -2,13 +2,13 @@ Panda Common Project
 --------------------
 
 Includes all libraries used by both server and monitor (and others).
---database proxies, and database table definitions
---scripts for creating database
---executor interface
---interfaces to ATLAS Production database
+
 
 Release Note
 ------------
+
+* current
+  * added semaphore to logger to limit the number of concurrent emitters
 
 * 0.0.5 (5/15/2009)
   * tagged for 0.0.5

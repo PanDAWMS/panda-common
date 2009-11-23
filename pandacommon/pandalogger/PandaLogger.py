@@ -11,13 +11,14 @@ os.environ['TZ'] = 'UTC'
 # a thread to send a record to a web server
 class _Emitter (threading.Thread):
     # constructor
-    def __init__(self,host,port,url,method,data):
+    def __init__(self,host,port,url,method,data,semaphore):
         threading.Thread.__init__(self)
         self.host   = host
         self.port   = port
         self.url    = url
         self.method = method
         self.data   = data
+        self.semaphore = semaphore
 
     # main
     def run(self):
@@ -40,6 +41,8 @@ class _Emitter (threading.Thread):
             h.getresponse()    # can't do anything with the result
         except:
             pass
+        self.semaphore.release()
+        
 
 class _PandaHTTPLogHandler(logging.Handler):
     """
@@ -65,6 +68,11 @@ class _PandaHTTPLogHandler(logging.Handler):
         self.method = method
         # create lock for params, cannot use createLock()
         self.mylock = threading.Lock()
+        # semaphore to limit the number of concurrent emitters
+        if logger_config.daemon.has_key('nemitters'):
+            self.mySemaphore = threading.Semaphore(int(logger_config.daemon['nemitters']))
+        else:
+            self.mySemaphore = threading.Semaphore(10)
         # parameters
         self.params = {}
         self.params['PandaID'] = -1
@@ -93,8 +101,11 @@ class _PandaHTTPLogHandler(logging.Handler):
         # encode data
         data = urllib.urlencode(self.mapLogRecord(record))
         url = "%s:%s%s" % ( self.url, self.port, self.urlprefix )
-        # start Emitter
-        _Emitter(self.host,self.port,self.urlprefix,self.method,data).start()
+        # try to lock Semaphore
+        if self.mySemaphore.acquire(False):
+            # start Emitter
+            _Emitter(self.host,self.port,self.urlprefix,self.method,
+                     data,self.mySemaphore).start()
 
     def setParams(self, params):
         for pname in params.keys():
