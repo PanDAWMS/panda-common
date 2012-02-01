@@ -8,6 +8,7 @@ Release Note
 ------------
 
 * current
+  * use POST instead of GET to send log
   * added semaphore to logger to limit the number of concurrent emitters
 
 * 0.0.5 (5/15/2009)

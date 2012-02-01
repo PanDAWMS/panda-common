@@ -51,7 +51,7 @@ class _PandaHTTPLogHandler(logging.Handler):
     POST semantics.
     """
 
-    def __init__(self, host, url, port=80, urlprefix='', method="GET"):
+    def __init__(self, host, url, port=80, urlprefix='', method="POST"):
         """
         Initialize the instance with the host, the request URL, and the method
         ("GET" or "POST")
