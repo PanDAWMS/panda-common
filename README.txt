@@ -8,7 +8,8 @@ Release Note
 ------------
 
 * current
-  * use POST instead of GET to send log
+  * imposed the limit of 4000 on the logging message
+  * use POST instead of GET to send log ( <- suspicious 2013/02/13 )
   * added semaphore to logger to limit the number of concurrent emitters
 
 * 0.0.5 (5/15/2009)

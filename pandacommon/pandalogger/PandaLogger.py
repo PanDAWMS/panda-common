@@ -86,10 +86,20 @@ class _PandaHTTPLogHandler(logging.Handler):
         that is sent as the CGI data. Overwrite in your class.
         Contributed by Franz  Glasner.
         """
-
         newrec = record.__dict__
         for p in self.params:
             newrec[p] = self.params[p]
+        # remove msg since only message is used
+        try:
+            del newrec['msg']
+        except:
+            pass
+        # truncate the message
+        maxParamLength = 4000
+        try:
+            newrec['message'] = newrec['message'][:maxParamLength]
+        except:
+            pass
         return newrec
 
     def emit(self, record):
