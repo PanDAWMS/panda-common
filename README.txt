@@ -8,6 +8,7 @@ Release Note
 ------------
 
 * current
+  * added LogWrapper 
   * imposed the limit of 4000 on the logging message
   * use POST instead of GET to send log ( <- suspicious 2013/02/13 )
   * added semaphore to logger to limit the number of concurrent emitters
