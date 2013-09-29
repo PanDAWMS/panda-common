@@ -8,6 +8,7 @@ Release Note
 ------------
 
 * current
+  * added pandautils
   * added LogWrapper 
   * imposed the limit of 4000 on the logging message
   * use POST instead of GET to send log ( <- suspicious 2013/02/13 )

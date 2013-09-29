@@ -85,7 +85,8 @@ setup(
     url='https://twiki.cern.ch/twiki/bin/view/Atlas/PanDA',
     packages=[ 'pandacommon',
                'pandacommon.liveconfigparser',
-               'pandacommon.pandalogger',               
+               'pandacommon.pandalogger',
+               'pandacommon.pandautils',
               ],
     data_files=[ 
                 ('etc/panda',  
