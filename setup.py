@@ -1,9 +1,18 @@
-#!/usr/bin/env python
+#
 #
 # Setup prog for Panda Common
 #
 #
-release_version='0.0.5'
+# set PYTHONPATH to use the current directory first
+import sys
+sys.path.insert(0,'.')
+
+# get release version
+import os
+import PandaPkgInfo
+release_version = PandaPkgInfo.release_version
+if os.environ.has_key('BUILD_NUMBER'):
+    release_version = '{0}.{1}'.format(release_version,os.environ['BUILD_NUMBER'])
 
 import re
 from distutils.core import setup

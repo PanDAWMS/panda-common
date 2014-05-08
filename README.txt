@@ -8,6 +8,7 @@ Release Note
 ------------
 
 * current
+  * added a build number to version name
   * added pandautils
   * added LogWrapper 
   * imposed the limit of 4000 on the logging message
