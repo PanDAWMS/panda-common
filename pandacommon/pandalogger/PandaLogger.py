@@ -89,13 +89,12 @@ class _PandaHTTPLogHandler(logging.Handler):
         newrec = record.__dict__
         for p in self.params:
             newrec[p] = self.params[p]
-        # remove msg since only message is used
+        maxParamLength = 4000
+        # truncate the message
         try:
-            del newrec['msg']
+            newrec['msg'] = newrec['msg'][:maxParamLength]
         except:
             pass
-        # truncate the message
-        maxParamLength = 4000
         try:
             newrec['message'] = newrec['message'][:maxParamLength]
         except:
@@ -135,17 +134,17 @@ _pandalog = logging.getLogger('panda')
 _pandalog.setLevel(logging.DEBUG)
 _txtlog = logging.getLogger('panda.log')
 _weblog = logging.getLogger('panda.mon')
-_allwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost'],'http://%s'%logger_config.daemon['loghost'],
-                                logger_config.daemon['monport-apache'],logger_config.daemon['monurlprefix'],'GET')
-_allwebh.setLevel(logging.DEBUG)
-_txth = logging.FileHandler('%s/panda.log'%logger_config.daemon['logdir'])
-_txth.setLevel(logging.DEBUG)
 _formatter = logging.Formatter('%(asctime)s %(name)-12s: %(levelname)-8s %(message)s')
-_txth.setFormatter(_formatter)
-_allwebh.setFormatter(_formatter)
-#_txtlog.addHandler(_txth)
-_weblog.addHandler(_txth)   # if http log doesn't have a text handler it doesn't work
-_weblog.addHandler(_allwebh)
+if len(_weblog.handlers) < 2: 
+    _allwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost'],'http://%s'%logger_config.daemon['loghost'],
+                                    logger_config.daemon['monport-apache'],logger_config.daemon['monurlprefix'],'GET')
+    _allwebh.setLevel(logging.DEBUG)
+    _txth = logging.FileHandler('%s/panda.log'%logger_config.daemon['logdir'])
+    _txth.setLevel(logging.DEBUG)
+    _txth.setFormatter(_formatter)
+    _allwebh.setFormatter(_formatter)
+    _weblog.addHandler(_txth)   # if http log doesn't have a text handler it doesn't work
+    _weblog.addHandler(_allwebh)
 
 # no more HTTP handler
 del _PandaHTTPLogHandler

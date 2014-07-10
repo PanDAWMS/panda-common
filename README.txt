@@ -8,6 +8,7 @@ Release Note
 ------------
 
 * current
+  * added a protectionto to PandaLogger against multiple import
   * added a build number to version name
   * added pandautils
   * added LogWrapper 
