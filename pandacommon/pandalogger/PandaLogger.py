@@ -8,6 +8,19 @@ import urllib
 import os
 os.environ['TZ'] = 'UTC'
 
+
+# logger map
+loggerMap = {}
+
+# wrapper to avoid duplication of loggers with the same name
+def getLoggerWrapper(loggerName):
+    global loggerMap
+    if not loggerName in loggerMap:
+        loggerMap[loggerName] = logging.getLogger(loggerName)
+    return loggerMap[loggerName]
+
+
+
 # a thread to send a record to a web server
 class _Emitter (threading.Thread):
     # constructor
@@ -130,10 +143,10 @@ class _PandaHTTPLogHandler(logging.Handler):
 
 
 # setup logger
-_pandalog = logging.getLogger('panda')
+_pandalog = getLoggerWrapper('panda')
 _pandalog.setLevel(logging.DEBUG)
-_txtlog = logging.getLogger('panda.log')
-_weblog = logging.getLogger('panda.mon')
+_txtlog = getLoggerWrapper('panda.log')
+_weblog = getLoggerWrapper('panda.mon')
 _formatter = logging.Formatter('%(asctime)s %(name)-12s: %(levelname)-8s %(message)s')
 if len(_weblog.handlers) < 2: 
     _allwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost'],'http://%s'%logger_config.daemon['loghost'],
@@ -169,7 +182,8 @@ class PandaLogger:
         self.params['Type'] = type
 
     def getLogger(self, lognm):
-        logh = logging.getLogger("panda.log.%s"%lognm)
+        logh = getLoggerWrapper("panda.log.%s"%lognm)
+        logh.propagate = False
         txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
         txth.setLevel(logging.DEBUG)
         txth.setFormatter(_formatter)
@@ -177,7 +191,7 @@ class PandaLogger:
         return logh
 
     def getHttpLogger(self, lognm):
-        httph = logging.getLogger('panda.mon.%s'%lognm)
+        httph = getLoggerWrapper('panda.mon.%s'%lognm)
         return httph
 
     def setParams(self, params):
