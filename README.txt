@@ -8,6 +8,7 @@ Release Note
 ------------
 
 * current
+  * added buffering to LogWrapper
   * added a protection to PandaLogger to avoid duplicated logging
   * added a protection to PandaLogger against multiple import
   * added a build number to version name
