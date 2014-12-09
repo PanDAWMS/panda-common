@@ -1,8 +1,10 @@
 import datetime
+from PandaLogger import PandaLogger
+
 
 # wrapper to set prefix to logging messages
 class LogWrapper:
-    def __init__(self,log,prefix='',lineLimit=100):
+    def __init__(self,log,prefix='',lineLimit=100,monToken=None):
         # use timestamp as prefix 
         if prefix == None:
             self.prefix = datetime.datetime.utcnow().isoformat('/')
@@ -13,6 +15,11 @@ class LogWrapper:
         # message buffer
         self.msgBuffer = []
         self.lineLimit = lineLimit
+        # token for monitor
+        if monToken != None:
+            self.monToken = monToken
+        else:
+            self.monToken = self.prefix
 
 
     def keepMsg(self,msg):
@@ -60,3 +67,27 @@ class LogWrapper:
         return strMsg
 
             
+    # send message to logger
+    def sendMsg(self,message,loggerName,msgType,msgLevel='info'):
+        try:
+            # get logger
+            tmpPandaLogger = PandaLogger()
+            # lock HTTP handler
+            tmpPandaLogger.lock()
+            tmpPandaLogger.setParams({'Type':msgType})
+            # get logger
+            tmpLogger = tmpPandaLogger.getHttpLogger(loggerName)
+            # add message
+            message = self.monToken + ' ' + message
+            if msgLevel=='error':
+                tmpLogger.error(message)
+            elif msgLevel=='warning':
+                tmpLogger.warning(message)
+            elif msgLevel=='info':
+                tmpLogger.info(message)
+            else:
+                tmpLogger.debug(message)                
+            # release HTTP handler
+            tmpPandaLogger.release()
+        except:
+            pass
