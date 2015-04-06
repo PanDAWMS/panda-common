@@ -2,6 +2,6 @@
 loghost=panda.cern.ch
 monport-apache=80
 monurlprefix=/logger/logger/query
-logdir=@@install_dir@@/var/log/panda
+logdir=/var/log/panda
 nemitters=10
 
