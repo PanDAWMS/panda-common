@@ -23,8 +23,6 @@ from distutils.command.install_data import install_data as install_data_org
 class install_panda(install_org):
     def initialize_options (self):
         install_org.initialize_options(self)
-        self.prefix = '/data/atlpan/srv'
-                    
 
 # generates files using templates and install them
 class install_data_panda (install_data_org):
@@ -63,6 +61,11 @@ class install_data_panda (install_data_org):
                         raise RuntimeError,'unknown pattern %s in %s' % (item,srcFile)
                     # get pattern
                     patt = getattr(self,item)
+                    
+                    # remove install root, if any
+                    if self.root is not None and patt.startswith(self.root):
+                        patt = patt[len(self.root):]
+                    
                     # remove build/*/dump for bdist
                     patt = re.sub('build/[^/]+/dumb','',patt)
                     # remove /var/tmp/*-buildroot for bdist_rpm
@@ -98,7 +101,7 @@ setup(
                'pandacommon.pandautils',
               ],
     data_files=[ 
-                ('etc/panda',  
+                ('/etc/panda',  
                  ['templates/panda_common.cfg.rpmnew.template']
                  ),
                 ],
