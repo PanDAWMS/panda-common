@@ -3,11 +3,12 @@ import logger_config
 import threading
 import httplib
 import urllib
+import json
+from datetime import datetime
 
 # set TZ for timestamp
 import os
 os.environ['TZ'] = 'UTC'
-
 
 # logger map
 loggerMap = {}
@@ -18,7 +19,6 @@ def getLoggerWrapper(loggerName):
     if not loggerName in loggerMap:
         loggerMap[loggerName] = logging.getLogger(loggerName)
     return loggerMap[loggerName]
-
 
 
 # a thread to send a record to a web server
@@ -32,6 +32,16 @@ class _Emitter (threading.Thread):
         self.method = method
         self.data   = data
         self.semaphore = semaphore
+
+    def getData(self, src, chunk_size=1024):
+        """
+        Use this function for debug purposes in order to print 
+        out the response from the server
+        """
+        d = src.read(chunk_size)
+        while d:
+            yield d
+            d = src.read(chunk_size)
 
     # main
     def run(self):
@@ -51,7 +61,10 @@ class _Emitter (threading.Thread):
             h.endheaders()
             if self.method == "POST":
                 h.send(self.data)
-            h.getresponse()    # can't do anything with the result
+            response = h.getresponse()    # can't do anything with the result
+            #for s in self.getData(response, 1024):
+            #    print s
+
         except:
             pass
         self.semaphore.release()
@@ -64,7 +77,7 @@ class _PandaHTTPLogHandler(logging.Handler):
     POST semantics.
     """
 
-    def __init__(self, host, url, port=80, urlprefix='', method="POST"):
+    def __init__(self, host, url, port=80, urlprefix='', method="POST", migrated=False):
         """
         Initialize the instance with the host, the request URL, and the method
         ("GET" or "POST")
@@ -79,6 +92,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         self.port = port
         self.urlprefix = urlprefix
         self.method = method
+        self.migrated = migrated
         # create lock for params, cannot use createLock()
         self.mylock = threading.Lock()
         # semaphore to limit the number of concurrent emitters
@@ -121,8 +135,13 @@ class _PandaHTTPLogHandler(logging.Handler):
         Send the record to the Web server as an URL-encoded dictionary
         """
         # encode data
-        data = urllib.urlencode(self.mapLogRecord(record))
-        url = "%s:%s%s" % ( self.url, self.port, self.urlprefix )
+        # Panda logger is going to be migrated. Until this is completed we need to support the old and new logger
+        # The new logger needs to be json encoded and use POST method
+        if migrated:
+            data = json.dumps([self.mapLogRecord(record)])
+        else:
+            data = urllib.urlencode(self.mapLogRecord(record))
+        
         # try to lock Semaphore
         if self.mySemaphore.acquire(False):
             # start Emitter
@@ -148,9 +167,20 @@ _pandalog.setLevel(logging.DEBUG)
 _txtlog = getLoggerWrapper('panda.log')
 _weblog = getLoggerWrapper('panda.mon')
 _formatter = logging.Formatter('%(asctime)s %(name)-12s: %(levelname)-8s %(message)s')
-if len(_weblog.handlers) < 2: 
+
+if logger_config.daemon.has_key('migrated'):
+    migrated = logger_config.daemon['migrated']
+else:
+    migrated = False
+
+if len(_weblog.handlers) < 2:
+    if migrated:
+        method = 'POST'
+    else:
+        method = 'GET'
     _allwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost'],'http://%s'%logger_config.daemon['loghost'],
-                                    logger_config.daemon['monport-apache'],logger_config.daemon['monurlprefix'],'GET')
+                                    logger_config.daemon['monport-apache'], logger_config.daemon['monurlprefix'],
+                                    method, migrated)
     _allwebh.setLevel(logging.DEBUG)
     _txth = logging.FileHandler('%s/panda.log'%logger_config.daemon['logdir'])
     _txth.setLevel(logging.DEBUG)
