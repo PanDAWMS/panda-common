@@ -4,7 +4,7 @@ import threading
 import httplib
 import urllib
 import json
-from datetime import datetime
+import time
 
 # set TZ for timestamp
 import os
@@ -137,8 +137,13 @@ class _PandaHTTPLogHandler(logging.Handler):
         # encode data
         # Panda logger is going to be migrated. Until this is completed we need to support the old and new logger
         # The new logger needs to be json encoded and use POST method
+        
         if migrated:
-            data = json.dumps([self.mapLogRecord(record)])
+            arr=[{
+                  "headers":{"timestamp" : time.time(), "host" : "%s:%s"%(self.url, self.port)},
+                  "body": "%s"%self.mapLogRecord(record)
+                 }]
+            data = json.dumps(arr)
         else:
             data = urllib.urlencode(self.mapLogRecord(record))
         
