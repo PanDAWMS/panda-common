@@ -6,6 +6,10 @@ import urllib
 import json
 import time
 
+# encodings
+JSON = 'json'
+URL = 'url'
+
 # set TZ for timestamp
 import os
 os.environ['TZ'] = 'UTC'
@@ -77,7 +81,7 @@ class _PandaHTTPLogHandler(logging.Handler):
     POST semantics.
     """
 
-    def __init__(self, host, url, port=80, urlprefix='', method="POST", migrated=False):
+    def __init__(self, host, url, port=80, urlprefix='', method="POST", encoding=URL):
         """
         Initialize the instance with the host, the request URL, and the method
         ("GET" or "POST")
@@ -92,7 +96,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         self.port = port
         self.urlprefix = urlprefix
         self.method = method
-        self.migrated = migrated
+        self.encoding = encoding
         # create lock for params, cannot use createLock()
         self.mylock = threading.Lock()
         # semaphore to limit the number of concurrent emitters
@@ -138,7 +142,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         # Panda logger is going to be migrated. Until this is completed we need to support the old and new logger
         # The new logger needs to be json encoded and use POST method
         
-        if migrated:
+        if self.encoding == JSON:
             arr=[{
                   "headers":{"timestamp" : time.time()*1000, "host" : "%s:%s"%(self.url, self.port)},
                   "body": "%s"%self.mapLogRecord(record)
@@ -150,8 +154,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         # try to lock Semaphore
         if self.mySemaphore.acquire(False):
             # start Emitter
-            _Emitter(self.host,self.port,self.urlprefix,self.method,
-                     data,self.mySemaphore).start()
+            _Emitter(self.host, self.port, self.urlprefix, self.method, data, self.mySemaphore).start()
 
     def setParams(self, params):
         for pname in params.keys():
@@ -171,28 +174,32 @@ _pandalog = getLoggerWrapper('panda')
 _pandalog.setLevel(logging.DEBUG)
 _txtlog = getLoggerWrapper('panda.log')
 _weblog = getLoggerWrapper('panda.mon')
+_newweblog = getLoggerWrapper('panda.mon_new')
 _formatter = logging.Formatter('%(asctime)s %(name)-12s: %(levelname)-8s %(message)s')
 
-if logger_config.daemon.has_key('migrated'):
-    migrated = logger_config.daemon['migrated']
-else:
-    migrated = False
-
 if len(_weblog.handlers) < 2:
-    if migrated:
-        method = 'POST'
-    else:
-        method = 'GET'
+    
     _allwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost'],'http://%s'%logger_config.daemon['loghost'],
                                     logger_config.daemon['monport-apache'], logger_config.daemon['monurlprefix'],
-                                    method, migrated)
+                                    logger_config.daemon['method'], logger_config.daemon['encoding'])
     _allwebh.setLevel(logging.DEBUG)
+    _allwebh.setFormatter(_formatter)
+    
+    if logger_config.daemon.has_key('loghost_new'):
+        _newwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost_new'],'http://%s'%logger_config.daemon['loghost_new'],
+                                        logger_config.daemon['monport-apache_new'], logger_config.daemon['monurlprefix'],
+                                        logger_config.daemon['method'], logger_config.daemon['encoding_new'])
+        _newwebh.setLevel(logging.DEBUG)
+        _newwebh.setFormatter(_formatter)
+    
     _txth = logging.FileHandler('%s/panda.log'%logger_config.daemon['logdir'])
     _txth.setLevel(logging.DEBUG)
     _txth.setFormatter(_formatter)
-    _allwebh.setFormatter(_formatter)
+    
     _weblog.addHandler(_txth)   # if http log doesn't have a text handler it doesn't work
     _weblog.addHandler(_allwebh)
+    if logger_config.daemon.has_key('loghost_new'):
+        _weblog.addHandler(_newwebh)
 
 # no more HTTP handler
 del _PandaHTTPLogHandler
