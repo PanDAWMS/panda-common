@@ -140,7 +140,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         
         if migrated:
             arr=[{
-                  "headers":{"timestamp" : time.time(), "host" : "%s:%s"%(self.url, self.port)},
+                  "headers":{"timestamp" : time.time()*1000, "host" : "%s:%s"%(self.url, self.port)},
                   "body": "%s"%self.mapLogRecord(record)
                  }]
             data = json.dumps(arr)
