@@ -144,7 +144,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         
         if self.encoding == JSON:
             arr=[{
-                  "headers":{"timestamp" : time.time()*1000, "host" : "%s:%s"%(self.url, self.port)},
+                  "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
                   "body": "%s"%self.mapLogRecord(record)
                  }]
             data = json.dumps(arr)
@@ -188,7 +188,7 @@ if len(_weblog.handlers) < 2:
     if logger_config.daemon.has_key('loghost_new'):
         _newwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost_new'],'http://%s'%logger_config.daemon['loghost_new'],
                                         logger_config.daemon['monport-apache_new'], logger_config.daemon['monurlprefix'],
-                                        logger_config.daemon['method'], logger_config.daemon['encoding_new'])
+                                        logger_config.daemon['method_new'], logger_config.daemon['encoding_new'])
         _newwebh.setLevel(logging.DEBUG)
         _newwebh.setFormatter(_formatter)
     
