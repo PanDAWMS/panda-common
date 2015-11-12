@@ -99,7 +99,7 @@ setup(
                'pandacommon.liveconfigparser',
                'pandacommon.pandalogger',
                'pandacommon.pandautils',
-               'test',
+               'pandacommon.test',
               ],
     data_files=[ 
                 ('/etc/panda',  
