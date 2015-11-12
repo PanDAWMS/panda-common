@@ -115,7 +115,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         """
         Default implementation of mapping the log record into a dict
         that is sent as the CGI data. Overwrite in your class.
-        Contributed by Franz  Glasner.
+        Contributed by Franz Glasner.
         """
         newrec = record.__dict__
         for p in self.params:
@@ -143,6 +143,20 @@ class _PandaHTTPLogHandler(logging.Handler):
         # The new logger needs to be json encoded and use POST method
         
         if self.encoding == JSON:
+            mapLogDict = self.mapLogRecord(record)
+            mapLogString = '{'
+            for key, value in mapLogDict.iteritems():
+                if isinstance(key, basestring):
+                    mapLogString = mapLogString + '\"{0}\": '.format(key)
+                else:
+                    mapLogString = mapLogString + '{0}: '.format(key)
+                
+                if isinstance(value, basestring):
+                    mapLogString = mapLogString + '\"{0}\", '.format(value)
+                else:
+                    mapLogString = mapLogString + '{0}, '.format(key)
+            mapLogString = mapLogString + '}' 
+
             arr=[{
                   "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
                   "body": "%s"%self.mapLogRecord(record)
