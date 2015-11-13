@@ -146,6 +146,8 @@ class _PandaHTTPLogHandler(logging.Handler):
             mapLogDict = self.mapLogRecord(record)
             mapLogString = '{'
             for key, value in mapLogDict.iteritems():
+                if key not in ["relativeCreated", "process", "module", "funcName", "message"]:
+                    continue
                 if isinstance(key, basestring):
                     mapLogString = mapLogString + '\"{0}\": '.format(key)
                 else:
@@ -154,8 +156,9 @@ class _PandaHTTPLogHandler(logging.Handler):
                 if isinstance(value, basestring):
                     mapLogString = mapLogString + '\"{0}\", '.format(value)
                 else:
-                    mapLogString = mapLogString + '{0}, '.format(key)
-            mapLogString = mapLogString + '}' 
+                    mapLogString = mapLogString + '{0}, '.format(value)
+            mapLogString = mapLogString[:-2] + '}' 
+            
 
             arr=[{
                   "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
