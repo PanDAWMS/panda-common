@@ -162,7 +162,7 @@ class _PandaHTTPLogHandler(logging.Handler):
 
             arr=[{
                   "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
-                  "body": "%s"%self.mapLogRecord(record)
+                  "body": "%s"%mapLogString
                  }]
             data = json.dumps(arr)
         else:
