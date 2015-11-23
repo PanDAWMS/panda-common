@@ -144,25 +144,10 @@ class _PandaHTTPLogHandler(logging.Handler):
         
         if self.encoding == JSON:
             mapLogDict = self.mapLogRecord(record)
-            mapLogString = '{'
-            for key, value in mapLogDict.iteritems():
-                if key not in ["relativeCreated", "process", "module", "funcName", "message"]:
-                    continue
-                if isinstance(key, basestring):
-                    mapLogString = mapLogString + '\"{0}\": '.format(key)
-                else:
-                    mapLogString = mapLogString + '{0}: '.format(key)
-                
-                if isinstance(value, basestring):
-                    mapLogString = mapLogString + '\"{0}\", '.format(value)
-                else:
-                    mapLogString = mapLogString + '{0}, '.format(value)
-            mapLogString = mapLogString[:-2] + '}' 
-            
 
             arr=[{
                   "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
-                  "body": "%s"%mapLogString
+                  "body": "{0}".format(json.dumps(mapLogDict))
                  }]
             data = json.dumps(arr)
         else:
