@@ -143,11 +143,10 @@ class _PandaHTTPLogHandler(logging.Handler):
         # The new logger needs to be json encoded and use POST method
         
         if self.encoding == JSON:
-            mapLogDict = self.mapLogRecord(record)
 
             arr=[{
                   "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
-                  "body": "{0}".format(json.dumps(mapLogDict))
+                  "body": "{0}".format(json.dumps(self.mapLogRecord(record)))
                  }]
             data = json.dumps(arr)
         else:
