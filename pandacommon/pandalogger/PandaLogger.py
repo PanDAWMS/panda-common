@@ -64,7 +64,8 @@ class _Emitter (threading.Thread):
                 h.putheader("Content-length", str(len(self.data)))
             h.endheaders()
             if self.method == "POST":
-                h.send(self.data)
+                header = {'Content-type':'application/json; charset=UTF-8'}
+                h.send(self.data, header=header)
             response = h.getresponse()    # can't do anything with the result
             #for s in self.getData(response, 1024):
             #    print s
