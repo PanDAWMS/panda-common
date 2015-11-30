@@ -69,7 +69,7 @@ class install_data_panda (install_data_org):
                     # remove build/*/dump for bdist
                     patt = re.sub('build/[^/]+/dumb','',patt)
                     # remove /var/tmp/*-buildroot for bdist_rpm
-                    patt = re.sub('/var/tmp/.*-buildroot','',patt)
+                    patt = re.sub('/var/tmp/.*-buildroot','',patt)                    
                     # replace
                     filedata = filedata.replace('@@%s@@' % item, patt)
                 # write to dest
@@ -99,7 +99,6 @@ setup(
                'pandacommon.liveconfigparser',
                'pandacommon.pandalogger',
                'pandacommon.pandautils',
-               'pandacommon.test',
               ],
     data_files=[ 
                 ('/etc/panda',  
