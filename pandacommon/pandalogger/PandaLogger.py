@@ -62,8 +62,8 @@ class _Emitter (threading.Thread):
             h.putrequest(self.method, url)
             if self.method == "POST":
                 h.putheader("Content-length", str(len(self.data)))
-            h.endheaders()
-            if self.method == "POST":
+                h.putheader("Content-type", "application/json; charset=UTF-8")
+                h.endheaders()
                 h.send(self.data)
             response = h.getresponse()    # can't do anything with the result
             #for s in self.getData(response, 1024):
@@ -145,8 +145,8 @@ class _PandaHTTPLogHandler(logging.Handler):
         if self.encoding == JSON:
             arr=[{
                   "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
-                  "body": "%s"%self.mapLogRecord(record)
-                 }]
+                  "body": "{0}".format(json.dumps(self.mapLogRecord(record)))
+                }]
             data = json.dumps(arr)
         else:
             data = urllib.urlencode(self.mapLogRecord(record))
