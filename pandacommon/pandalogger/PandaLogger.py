@@ -51,7 +51,7 @@ class _Emitter (threading.Thread):
     def run(self):
         # send the record to the Web server as an URL-encoded dictionary
         try:
-            h = httplib.HTTPConnection(self.host, self.port)
+            h = httplib.HTTPConnection(self.host, self.port, timeout=0.3)
             url = self.url
             if self.method == "GET":
                 if (string.find(url, '?') >= 0):
@@ -120,15 +120,16 @@ class _PandaHTTPLogHandler(logging.Handler):
         """
         newrec = record.__dict__
         for p in self.params:
+            if 
             newrec[p] = self.params[p]
         maxParamLength = 4000
-        # truncate the message
+        # truncate and clean the message from non-UTF-8 characters
         try:
-            newrec['msg'] = newrec['msg'][:maxParamLength]
+            newrec['msg'] = newrec['msg'][:maxParamLength].decode('utf-8', 'ignore').encode('utf-8')
         except:
             pass
         try:
-            newrec['message'] = newrec['message'][:maxParamLength]
+            newrec['message'] = newrec['message'][:maxParamLength].decode('utf-8', 'ignore').encode('utf-8')
         except:
             pass
         return newrec
@@ -142,20 +143,27 @@ class _PandaHTTPLogHandler(logging.Handler):
         # encode data
         # Panda logger is going to be migrated. Until this is completed we need to support the old and new logger
         # The new logger needs to be json encoded and use POST method
-        
-        if self.encoding == JSON:
-            arr=[{
-                  "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
-                  "body": "{0}".format(json.dumps(self.mapLogRecord(record)))
-                }]
-            data = json.dumps(arr)
-        else:
-            data = urllib.urlencode(self.mapLogRecord(record))
-        
-        # try to lock Semaphore
-        if self.mySemaphore.acquire(False):
-            # start Emitter
-            _Emitter(self.host, self.port, self.urlprefix, self.method, data, self.mySemaphore).start()
+        try:
+            if self.encoding == JSON:
+                
+                body = self.mapLogRecord(record)
+                body['message'] = 
+                
+                arr=[{
+                      "headers":{"timestamp" : int(time.time())*1000, "host" : "%s:%s"%(self.url, self.port)},
+                      "body": "{0}".format(json.dumps(self.mapLogRecord(record)))
+                    }]
+                data = json.dumps(arr)
+            else:
+                data = urllib.urlencode(self.mapLogRecord(record))
+            
+            # try to lock Semaphore
+            if self.mySemaphore.acquire(False):
+                # start Emitter
+                _Emitter(self.host, self.port, self.urlprefix, self.method, data, self.mySemaphore).start()
+        except UnicodeDecodeError:
+            #We lose the message
+            pass
 
     def setParams(self, params):
         for pname in params.keys():
