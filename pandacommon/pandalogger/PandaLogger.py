@@ -120,7 +120,6 @@ class _PandaHTTPLogHandler(logging.Handler):
         """
         newrec = record.__dict__
         for p in self.params:
-            if 
             newrec[p] = self.params[p]
         maxParamLength = 4000
         # truncate and clean the message from non-UTF-8 characters
