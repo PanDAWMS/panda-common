@@ -86,8 +86,9 @@ class LogWrapper:
             elif msgLevel=='info':
                 tmpLogger.info(message)
             else:
-                tmpLogger.debug(message)                
-            # release HTTP handler
-            tmpPandaLogger.release()
+                tmpLogger.debug(message)
         except:
             pass
+        finally:
+            # release HTTP handler
+            tmpPandaLogger.release()

@@ -170,7 +170,10 @@ class _PandaHTTPLogHandler(logging.Handler):
 
     # release lock
     def releaseHandler(self):
-        self.mylock.release()
+        try:
+            self.mylock.release()
+        except:
+            pass
 
 
 # setup logger
