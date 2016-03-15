@@ -51,7 +51,7 @@ class _Emitter (threading.Thread):
     def run(self):
         # send the record to the Web server as an URL-encoded dictionary
         try:
-            h = httplib.HTTPConnection(self.host, self.port, timeout=0.3)
+            h = httplib.HTTPConnection(self.host, self.port, timeout=1)
             url = self.url
             if self.method == "GET":
                 if (string.find(url, '?') >= 0):
@@ -247,6 +247,8 @@ class PandaLogger:
         for pname in params.keys():
             self.params[pname] = params[pname]
         _allwebh.setParams(self.params)
+        if logger_config.daemon.has_key('loghost_new'):
+            _newwebh.setParams(self.params)
 
     def getParam(self, pname):
         return self.params[pname]
@@ -254,8 +256,12 @@ class PandaLogger:
     # acquire lock for HTTP handler
     def lock(self):
         _allwebh.lockHandler()
+        if logger_config.daemon.has_key('loghost_new'):
+            _newwebh.lockHandler()
 
     # release lock
     def release(self):
         _allwebh.releaseHandler()
+        if logger_config.daemon.has_key('loghost_new'):
+            _newwebh.releaseHandler()
         
