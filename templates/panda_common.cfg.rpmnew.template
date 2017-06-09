@@ -13,3 +13,4 @@ monurlprefix=/logger/logger/query
 logdir=/var/log/panda
 nemitters=10
 
+log_level=DEBUG

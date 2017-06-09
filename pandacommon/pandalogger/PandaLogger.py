@@ -175,10 +175,16 @@ class _PandaHTTPLogHandler(logging.Handler):
         except:
             pass
 
-
+# log level
+logLevel = logging.DEBUG
+if 'log_level' in logger_config.daemon:
+    if logger_config.daemon['log_level'] in ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET']:
+        logLevel = getattr(logging, logger_config.daemon['log_level'])
 # setup logger
+_rootlog = getLoggerWrapper('')
+_rootlog.setLevel(logLevel)
 _pandalog = getLoggerWrapper('panda')
-_pandalog.setLevel(logging.DEBUG)
+_pandalog.setLevel(logLevel)
 _txtlog = getLoggerWrapper('panda.log')
 _weblog = getLoggerWrapper('panda.mon')
 _newweblog = getLoggerWrapper('panda.mon_new')
