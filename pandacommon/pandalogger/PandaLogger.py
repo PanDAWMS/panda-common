@@ -244,17 +244,17 @@ class PandaLogger:
             # interval
             tmpAttr = 'rotating_interval'
             if tmpAttr in logger_config.daemon:
-                rotatingInterval = logger_config.daemon[tmpAttr]
+                rotatingInterval = int(logger_config.daemon[tmpAttr])
             else:
                 rotatingInterval = 24
             # backup count
             tmpAttr = 'rotating_backup_count'
             if tmpAttr in logger_config.daemon:
-                backupCount = logger_config.daemon[tmpAttr]
+                backupCount = int(logger_config.daemon[tmpAttr])
             else:
                 backupCount = 1
             # handler with timed rotating
-            txth = logging.TimedRotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
+            txth = logging.handlers.TimedRotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
                                                     when='h',
                                                     interval=rotatingInterval,
                                                     backupCount=backupCount,
@@ -263,18 +263,18 @@ class PandaLogger:
             # max bytes
             tmpAttr = 'rotating_max_size'
             if tmpAttr in logger_config.daemon:
-                maxSize = logger_config.daemon[tmpAttr]
+                maxSize = int(logger_config.daemon[tmpAttr])
             else:
                 maxSize = 1024
             maxSize *= (1024 * 1024)
             # backup count
             tmpAttr = 'rotating_backup_count'
             if tmpAttr in logger_config.daemon:
-                backupCount = logger_config.daemon[tmpAttr]
+                backupCount = int(logger_config.daemon[tmpAttr])
             else:
                 backupCount = 1
             # handler with rotating based on size
-            txth = logging.RotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
+            txth = logging.handlers.RotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
                                                maxBytes=maxSize,
                                                backupCount=backupCount)
         else:
