@@ -239,7 +239,28 @@ class PandaLogger:
     def getLogger(self, lognm):
         logh = getLoggerWrapper("panda.log.%s"%lognm)
         logh.propagate = False
-        txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
+        tmpAttr = 'timed_rotating'
+        if tmpAttr in logger_config.daemon and logger_config.daemon[tmpAttr] == 'on':
+            # interval
+            tmpAttr = 'rotating_interval'
+            if tmpAttr in logger_config.daemon:
+                rotatingInterval = logger_config.daemon[tmpAttr]
+            else:
+                rotatingInterval = 24
+            # backup count
+            tmpAttr = 'rotating_backup_count'
+            if tmpAttr in logger_config.daemon:
+                backupCount = logger_config.daemon[tmpAttr]
+            else:
+                backupCount = 1
+            # handler with timed rotating
+            txth = logging.TimedRotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
+                                                    when='h',
+                                                    interval=rotatingInterval,
+                                                    backupCount=backupCount,
+                                                    utc=True)
+        else:
+            txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
         txth.setLevel(logging.DEBUG)
         txth.setFormatter(_formatter)
         logh.addHandler(txth)
