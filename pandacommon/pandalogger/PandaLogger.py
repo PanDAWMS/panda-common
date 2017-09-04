@@ -14,15 +14,26 @@ URL = 'url'
 import os
 os.environ['TZ'] = 'UTC'
 
+# log rotation
+rotateLog = False
+
 # logger map
 loggerMap = {}
+loggerMapLock = threading.Lock()
 
 # wrapper to avoid duplication of loggers with the same name
-def getLoggerWrapper(loggerName):
+def getLoggerWrapper(loggerName, checkNew=False):
+    loggerMapLock.acquire()
     global loggerMap
+    newFlag = False
     if not loggerName in loggerMap:
         loggerMap[loggerName] = logging.getLogger(loggerName)
-    return loggerMap[loggerName]
+        newFlag = True
+    loggerMapLock.release()
+    if checkNew:
+        return loggerMap[loggerName], newFlag
+    else:
+        return loggerMap[loggerName]
 
 
 # a thread to send a record to a web server
@@ -237,7 +248,7 @@ class PandaLogger:
         self.params['Type'] = type
 
     def getLogger(self, lognm):
-        logh = getLoggerWrapper("panda.log.%s"%lognm)
+        logh, newLogFlag = getLoggerWrapper("panda.log.%s" % lognm, True)
         logh.propagate = False
         tmpAttr = 'rotating_policy'
         if tmpAttr in logger_config.daemon and logger_config.daemon[tmpAttr] == 'time':
@@ -259,6 +270,8 @@ class PandaLogger:
                                                     interval=rotatingInterval,
                                                     backupCount=backupCount,
                                                     utc=True)
+            if newLogFlag and rotateLog:
+                txth.doRollover()
         elif tmpAttr in logger_config.daemon and logger_config.daemon[tmpAttr] == 'size':
             # max bytes
             tmpAttr = 'rotating_max_size'
@@ -277,6 +290,8 @@ class PandaLogger:
             txth = logging.handlers.RotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
                                                maxBytes=maxSize,
                                                backupCount=backupCount)
+            if newLogFlag and rotateLog:
+                txth.doRollover()
         else:
             txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
         txth.setLevel(logging.DEBUG)
@@ -310,3 +325,8 @@ class PandaLogger:
         if logger_config.daemon.has_key('loghost_new'):
             _newwebh.releaseHandler()
         
+    # rollover
+    @staticmethod
+    def doRollOver():
+        global rotateLog
+        rotateLog = True
