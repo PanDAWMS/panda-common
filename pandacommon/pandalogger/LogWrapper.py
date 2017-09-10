@@ -1,10 +1,11 @@
+import resource
 import datetime
 from PandaLogger import PandaLogger
 
 
 # wrapper to set prefix to logging messages
 class LogWrapper:
-    def __init__(self,log,prefix='',lineLimit=100,monToken=None):
+    def __init__(self,log,prefix='',lineLimit=100,monToken=None,seeMem=False):
         # use timestamp as prefix 
         if prefix == None:
             self.prefix = datetime.datetime.utcnow().isoformat('/')
@@ -20,6 +21,12 @@ class LogWrapper:
             self.monToken = monToken
         else:
             self.monToken = self.prefix
+        self.seeMem = seeMem
+
+    
+    # get memory usage
+    def getMemoryUsage(self):
+        return ' (mem usage {0} MB)'.format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
 
 
     def keepMsg(self,msg):
@@ -35,6 +42,8 @@ class LogWrapper:
         self.keepMsg(msg)
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
+        if self.seeMem:
+            msg += self.getMemoryUsage()
         self.logger.debug(msg)
 
     def info(self,msg):
@@ -42,6 +51,8 @@ class LogWrapper:
         self.keepMsg(msg)
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
+        if self.seeMem:
+            msg += self.getMemoryUsage()        
         self.logger.info(msg)
 
     def error(self,msg):
@@ -49,6 +60,8 @@ class LogWrapper:
         self.keepMsg(msg)
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
+        if self.seeMem:
+            msg += self.getMemoryUsage()
         self.logger.error(msg)
 
     def warning(self,msg):
@@ -56,6 +69,8 @@ class LogWrapper:
         self.keepMsg(msg)
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
+        if self.seeMem:
+            msg += self.getMemoryUsage()
         self.logger.warning(msg)
 
 
