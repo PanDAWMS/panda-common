@@ -16,7 +16,7 @@
 #
 
 import os
-from ConfigParser import ConfigParser, NoSectionError
+from configparser import ConfigParser, NoSectionError
 
 class LiveConfigParser(ConfigParser):
     
@@ -46,7 +46,7 @@ class LiveConfigParser(ConfigParser):
             os.path.expanduser('~/etc/panda/%s' % fileName),
             ]
         # use PANDA_HOME if it is defined
-        if os.environ.has_key('PANDA_HOME'):
+        if 'PANDA_HOME'in os.environ:
             confFiles.append('%s/etc/panda/%s' % (os.environ['PANDA_HOME'],fileName))
         # read
         ConfigParser.read(self,confFiles)

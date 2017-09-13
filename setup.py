@@ -26,6 +26,9 @@ setup(
     author_email='atlas-adc-panda@cern.ch',
     url='https://twiki.cern.ch/twiki/bin/view/Atlas/PanDA',
     packages=find_packages(),
+    install_requires=['configparser',
+                      'future',
+                      ],
     data_files=[ 
                 ('etc/panda',  
                  ['templates/panda_common.cfg.rpmnew.template']

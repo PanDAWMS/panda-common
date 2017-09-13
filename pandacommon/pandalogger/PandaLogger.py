@@ -1,7 +1,7 @@
 import logging, logging.handlers, string
-import logger_config
+from . import logger_config
 import threading
-import httplib
+import http.client as httplib
 import urllib
 import json
 import time
@@ -100,9 +100,9 @@ class _PandaHTTPLogHandler(logging.Handler):
         """
 
         logging.Handler.__init__(self)
-        method = string.upper(method)
+        method = method.upper()
         if method not in ["GET", "POST"]:
-            raise ValueError, "method must be GET or POST"
+            raise ValueError("method must be GET or POST")
         self.host = host
         self.url = url
         self.port = port
@@ -112,7 +112,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         # create lock for params, cannot use createLock()
         self.mylock = threading.Lock()
         # semaphore to limit the number of concurrent emitters
-        if logger_config.daemon.has_key('nemitters'):
+        if 'nemitters' in logger_config.daemon:
             self.mySemaphore = threading.Semaphore(int(logger_config.daemon['nemitters']))
         else:
             self.mySemaphore = threading.Semaphore(10)
@@ -209,7 +209,7 @@ if len(_weblog.handlers) < 2:
     _allwebh.setLevel(logging.DEBUG)
     _allwebh.setFormatter(_formatter)
     
-    if logger_config.daemon.has_key('loghost_new'):
+    if 'loghost_new' in logger_config.daemon:
         _newwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost_new'],'http://%s'%logger_config.daemon['loghost_new'],
                                         logger_config.daemon['monport-apache_new'], logger_config.daemon['monurlprefix'],
                                         logger_config.daemon['method_new'], logger_config.daemon['encoding_new'])
@@ -222,7 +222,7 @@ if len(_weblog.handlers) < 2:
     
     _weblog.addHandler(_txth)   # if http log doesn't have a text handler it doesn't work
     _weblog.addHandler(_allwebh)
-    if logger_config.daemon.has_key('loghost_new'):
+    if 'loghost_new' in logger_config.daemon:
         _weblog.addHandler(_newwebh)
 
 # no more HTTP handler
@@ -307,7 +307,7 @@ class PandaLogger:
         for pname in params.keys():
             self.params[pname] = params[pname]
         _allwebh.setParams(self.params)
-        if logger_config.daemon.has_key('loghost_new'):
+        if 'loghost_new' in logger_config.daemon:
             _newwebh.setParams(self.params)
 
     def getParam(self, pname):
@@ -316,13 +316,13 @@ class PandaLogger:
     # acquire lock for HTTP handler
     def lock(self):
         _allwebh.lockHandler()
-        if logger_config.daemon.has_key('loghost_new'):
+        if 'loghost_new' in logger_config.daemon:
             _newwebh.lockHandler()
 
     # release lock
     def release(self):
         _allwebh.releaseHandler()
-        if logger_config.daemon.has_key('loghost_new'):
+        if 'loghost_new' in logger_config.daemon:
             _newwebh.releaseHandler()
         
     # rollover

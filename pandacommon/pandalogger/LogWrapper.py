@@ -1,6 +1,6 @@
 import resource
 import datetime
-from PandaLogger import PandaLogger
+from .PandaLogger import PandaLogger
 
 
 # wrapper to set prefix to logging messages
