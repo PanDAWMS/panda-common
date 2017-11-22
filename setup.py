@@ -17,7 +17,7 @@ if 'BUILD_NUMBER' in os.environ:
 from setuptools import setup,find_packages
         
 setup(
-    name="panda-common",
+    name="panda-common-s",
     version=release_version,
     description=' PanDA Common Package',
     long_description='''This package contains PanDA Common Components''',

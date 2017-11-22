@@ -2,8 +2,9 @@
 # Install instructions for panda common
 #
 
-Project Dependencies
--- Need to have database set up and on.
+pip install panda-common-s
 
-Typical System Dependencies
--- python-curl
+
+####
+python setup.py bdist_wheel
+twine upload dist/*
