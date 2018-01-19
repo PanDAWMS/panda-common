@@ -16,7 +16,11 @@
 #
 
 import os
-import urllib2
+
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
 
 from configparser import ConfigParser, NoSectionError
 
@@ -53,7 +57,7 @@ class LiveConfigParser(ConfigParser):
         # read from URL
         if config_url is not None:
             try:
-                res = urllib2.urlopen(config_url)
+                res = urlopen(config_url)
             except Exception as e:
                 raise Exception('failed to load cfg from URL={0} since {1}'.format(config_url, str(e)))
             ConfigParser.readfp(self, res)
