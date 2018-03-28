@@ -5,7 +5,7 @@ from .PandaLogger import PandaLogger
 
 # wrapper to set prefix to logging messages
 class LogWrapper:
-    def __init__(self,log,prefix='',lineLimit=100,monToken=None,seeMem=False):
+    def __init__(self,log,prefix='',lineLimit=100,monToken=None,seeMem=False,hook=None):
         # use timestamp as prefix 
         if prefix == None:
             self.prefix = datetime.datetime.utcnow().isoformat('/')
@@ -22,6 +22,11 @@ class LogWrapper:
         else:
             self.monToken = self.prefix
         self.seeMem = seeMem
+        self.hook = hook
+        try:
+            self.logger_name = self.logger.name.split('.')[-1]
+        except:
+            self.logger_name = None
 
     
     # get memory usage
@@ -40,6 +45,11 @@ class LogWrapper:
     def debug(self,msg):
         msg = str(msg)
         self.keepMsg(msg)
+        try:
+            if self.hook is not None:
+                self.hook.add_dialog_message(msg, 'DEBUG', self.logger_name, self.prefix)
+        except:
+            pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
         if self.seeMem:
@@ -49,6 +59,11 @@ class LogWrapper:
     def info(self,msg):
         msg = str(msg)
         self.keepMsg(msg)
+        try:
+            if self.hook is not None:
+                self.hook.add_dialog_message(msg, 'INFO', self.logger_name, self.prefix)
+        except:
+            pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
         if self.seeMem:
@@ -58,6 +73,11 @@ class LogWrapper:
     def error(self,msg):
         msg = str(msg)
         self.keepMsg(msg)
+        try:
+            if self.hook is not None:
+                self.hook.add_dialog_message(msg, 'ERROR', self.logger_name, self.prefix)
+        except:
+            pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
         if self.seeMem:
@@ -67,6 +87,11 @@ class LogWrapper:
     def warning(self,msg):
         msg = str(msg)
         self.keepMsg(msg)
+        try:
+            if self.hook is not None:
+                self.hook.add_dialog_message(msg, 'WARNING', self.logger_name, self.prefix)
+        except:
+            pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
         if self.seeMem:
