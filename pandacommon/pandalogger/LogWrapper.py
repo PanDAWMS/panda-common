@@ -24,9 +24,9 @@ class LogWrapper:
         self.seeMem = seeMem
         self.hook = hook
         try:
-            self.logger_name = self.logger.name.split('.')[-1]
+            self.name = self.logger.name.split('.')[-1]
         except:
-            self.logger_name = None
+            self.name = ''
 
     
     # get memory usage
@@ -47,7 +47,7 @@ class LogWrapper:
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'DEBUG', self.logger_name, self.prefix)
+                self.hook.add_dialog_message(msg, 'DEBUG', self.name, self.prefix)
         except:
             pass
         if self.prefix != '':
@@ -61,7 +61,7 @@ class LogWrapper:
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'INFO', self.logger_name, self.prefix)
+                self.hook.add_dialog_message(msg, 'INFO', self.name, self.prefix)
         except:
             pass
         if self.prefix != '':
@@ -75,7 +75,7 @@ class LogWrapper:
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'ERROR', self.logger_name, self.prefix)
+                self.hook.add_dialog_message(msg, 'ERROR', self.name, self.prefix)
         except:
             pass
         if self.prefix != '':
@@ -89,7 +89,7 @@ class LogWrapper:
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'WARNING', self.logger_name, self.prefix)
+                self.hook.add_dialog_message(msg, 'WARNING', self.name, self.prefix)
         except:
             pass
         if self.prefix != '':
