@@ -247,7 +247,7 @@ class PandaLogger:
         self.params['User'] = user
         self.params['Type'] = type
 
-    def getLogger(self, lognm):
+    def getLogger(self, lognm, log_level=None):
         logh, newLogFlag = getLoggerWrapper("panda.log.%s" % lognm, True)
         logh.propagate = False
         tmpAttr = 'rotating_policy'
@@ -294,7 +294,11 @@ class PandaLogger:
                 txth.doRollover()
         else:
             txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
-        txth.setLevel(logging.DEBUG)
+        if log_level in ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET']:
+            log_level = getattr(logging, log_level)
+        else:
+            log_level = logging.DEBUG
+        txth.setLevel(log_level)
         txth.setFormatter(_formatter)
         logh.addHandler(txth)
         return logh
