@@ -296,6 +296,8 @@ class PandaLogger:
             txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
         if log_level in ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET']:
             log_level = getattr(logging, log_level)
+            if newLogFlag:
+                logh.setLevel(log_level)
         else:
             log_level = logging.DEBUG
         txth.setLevel(log_level)
