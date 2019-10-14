@@ -7,7 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
-* current
+* 0.0.12 (10/14/2019)
+  * python 2 and 3
+  * using pip
   * added log_level 
   * added hook to LogWrapper
   * added sendMsg to LogWrapper
