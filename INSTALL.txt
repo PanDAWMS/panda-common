@@ -2,8 +2,15 @@
 # Install instructions for panda common
 #
 
-pip install panda-common-s
+pip install panda-common
 
+or
+
+rm -rf dist; python setup.py sdist; pip install dist/panda-common-*.tar.gz --upgrade
+
+
+### new config
+cp /usr/etc/panda/panda_common.cfg.rpmnew /etc/panda/panda_common.cfg
 
 ####
 python setup.py bdist_wheel --universal

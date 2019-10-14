@@ -22,7 +22,10 @@ try:
 except ImportError:
     from urllib2 import urlopen
 
-from configparser import ConfigParser, NoSectionError
+try:
+    from configparser import ConfigParser, NoSectionError
+except ImportError:
+    from ConfigParser import ConfigParser, NoSectionError
 
 class LiveConfigParser(ConfigParser):
     
@@ -60,6 +63,6 @@ class LiveConfigParser(ConfigParser):
                 res = urlopen(config_url)
             except Exception as e:
                 raise Exception('failed to load cfg from URL={0} since {1}'.format(config_url, str(e)))
-            ConfigParser.readfp(self, res)
+            ConfigParser.read_file(self, res)
         # read
         ConfigParser.read(self, confFiles)

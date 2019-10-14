@@ -1,5 +1,5 @@
 import sys
-from liveconfigparser.LiveConfigParser import LiveConfigParser
+from pandacommon.liveconfigparser.LiveConfigParser import LiveConfigParser
 
 
 # expand config parameters to module attributes

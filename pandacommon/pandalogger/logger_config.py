@@ -1,5 +1,5 @@
 import sys
-from liveconfigparser.LiveConfigParser import LiveConfigParser
+from pandacommon.liveconfigparser.LiveConfigParser import LiveConfigParser
 
 # get ConfigParser
 tmpConf = LiveConfigParser()

@@ -1,8 +1,14 @@
 import logging, logging.handlers, string
 from . import logger_config
 import threading
-import http.client as httplib
-import urllib
+try:
+    import http.client as httplib
+except ImportError:
+    import httplib
+try:
+    from urllib.parse import urlencode
+except ImportError:
+    from urllib import urlencode
 import json
 import time
 
@@ -161,7 +167,7 @@ class _PandaHTTPLogHandler(logging.Handler):
                     }]
                 data = json.dumps(arr)
             else:
-                data = urllib.urlencode(self.mapLogRecord(record))
+                data = urlencode(self.mapLogRecord(record))
             
             # try to lock Semaphore
             if self.mySemaphore.acquire(False):
