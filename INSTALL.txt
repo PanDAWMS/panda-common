@@ -2,8 +2,16 @@
 # Install instructions for panda common
 #
 
-Project Dependencies
--- Need to have database set up and on.
+pip install panda-common
 
-Typical System Dependencies
--- python-curl
+or
+
+rm -rf dist; python setup.py sdist; pip install dist/panda-common-*.tar.gz --upgrade
+
+
+### new config
+cp /usr/etc/panda/panda_common.cfg.rpmnew /etc/panda/panda_common.cfg
+
+####
+python setup.py bdist_wheel --universal
+twine upload dist/*

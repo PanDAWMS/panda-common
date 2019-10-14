@@ -1,0 +1,42 @@
+[logger]
+
+#########################################
+#
+# Parameters for logging infrastructure
+loghost=panda.cern.ch
+monport-apache=80
+method=GET
+encoding=url
+
+loghost_new=aipanda128.cern.ch
+monport-apache_new=8081
+method_new=POST
+encoding_new=json
+
+monurlprefix=/logger/logger/query
+logdir=/var/log/panda
+nemitters=10
+
+# logging level : CRITICAL, ERROR, WARNING, INFO, DEBUG, or NOTSET
+log_level=DEBUG
+
+#########################################
+#
+# Log rotation
+
+# Rotation policy
+#   time : rotation at certain timed intervals
+#   size : rotation at a predetermined size
+#   none : no rotation (default)
+rotating_policy=none
+
+# How many old log files should be saved
+rotating_backup_count=1
+
+# Rotation happens when the file size (in MB) is about to be exceeded.
+# Effective only when rotating_policy=size
+rotating_max_size=1024
+
+# Ratation interval in hour.
+# Effective only when rotating_policy=time
+rotating_interval=24

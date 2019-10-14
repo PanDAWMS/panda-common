@@ -8,6 +8,8 @@ Release Note
 ------------
 
 * current
+  * added log_level 
+  * added hook to LogWrapper
   * added sendMsg to LogWrapper
   * added buffering to LogWrapper
   * added a protection to PandaLogger to avoid duplicated logging

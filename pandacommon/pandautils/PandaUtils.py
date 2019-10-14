@@ -1,6 +1,6 @@
 import pytz
 import datetime
-import utils_config
+from . import utils_config
 
 
 # check if logrotating

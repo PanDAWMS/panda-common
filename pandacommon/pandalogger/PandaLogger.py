@@ -1,8 +1,14 @@
 import logging, logging.handlers, string
-import logger_config
+from . import logger_config
 import threading
-import httplib
-import urllib
+try:
+    import http.client as httplib
+except ImportError:
+    import httplib
+try:
+    from urllib.parse import urlencode
+except ImportError:
+    from urllib import urlencode
 import json
 import time
 
@@ -14,15 +20,26 @@ URL = 'url'
 import os
 os.environ['TZ'] = 'UTC'
 
+# log rotation
+rotateLog = False
+
 # logger map
 loggerMap = {}
+loggerMapLock = threading.Lock()
 
 # wrapper to avoid duplication of loggers with the same name
-def getLoggerWrapper(loggerName):
+def getLoggerWrapper(loggerName, checkNew=False):
+    loggerMapLock.acquire()
     global loggerMap
+    newFlag = False
     if not loggerName in loggerMap:
         loggerMap[loggerName] = logging.getLogger(loggerName)
-    return loggerMap[loggerName]
+        newFlag = True
+    loggerMapLock.release()
+    if checkNew:
+        return loggerMap[loggerName], newFlag
+    else:
+        return loggerMap[loggerName]
 
 
 # a thread to send a record to a web server
@@ -89,9 +106,9 @@ class _PandaHTTPLogHandler(logging.Handler):
         """
 
         logging.Handler.__init__(self)
-        method = string.upper(method)
+        method = method.upper()
         if method not in ["GET", "POST"]:
-            raise ValueError, "method must be GET or POST"
+            raise ValueError("method must be GET or POST")
         self.host = host
         self.url = url
         self.port = port
@@ -101,7 +118,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         # create lock for params, cannot use createLock()
         self.mylock = threading.Lock()
         # semaphore to limit the number of concurrent emitters
-        if logger_config.daemon.has_key('nemitters'):
+        if 'nemitters' in logger_config.daemon:
             self.mySemaphore = threading.Semaphore(int(logger_config.daemon['nemitters']))
         else:
             self.mySemaphore = threading.Semaphore(10)
@@ -150,7 +167,7 @@ class _PandaHTTPLogHandler(logging.Handler):
                     }]
                 data = json.dumps(arr)
             else:
-                data = urllib.urlencode(self.mapLogRecord(record))
+                data = urlencode(self.mapLogRecord(record))
             
             # try to lock Semaphore
             if self.mySemaphore.acquire(False):
@@ -175,10 +192,16 @@ class _PandaHTTPLogHandler(logging.Handler):
         except:
             pass
 
-
+# log level
+logLevel = logging.DEBUG
+if 'log_level' in logger_config.daemon:
+    if logger_config.daemon['log_level'] in ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET']:
+        logLevel = getattr(logging, logger_config.daemon['log_level'])
 # setup logger
+_rootlog = getLoggerWrapper('')
+_rootlog.setLevel(logLevel)
 _pandalog = getLoggerWrapper('panda')
-_pandalog.setLevel(logging.DEBUG)
+_pandalog.setLevel(logLevel)
 _txtlog = getLoggerWrapper('panda.log')
 _weblog = getLoggerWrapper('panda.mon')
 _newweblog = getLoggerWrapper('panda.mon_new')
@@ -192,7 +215,7 @@ if len(_weblog.handlers) < 2:
     _allwebh.setLevel(logging.DEBUG)
     _allwebh.setFormatter(_formatter)
     
-    if logger_config.daemon.has_key('loghost_new'):
+    if 'loghost_new' in logger_config.daemon:
         _newwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost_new'],'http://%s'%logger_config.daemon['loghost_new'],
                                         logger_config.daemon['monport-apache_new'], logger_config.daemon['monurlprefix'],
                                         logger_config.daemon['method_new'], logger_config.daemon['encoding_new'])
@@ -205,7 +228,7 @@ if len(_weblog.handlers) < 2:
     
     _weblog.addHandler(_txth)   # if http log doesn't have a text handler it doesn't work
     _weblog.addHandler(_allwebh)
-    if logger_config.daemon.has_key('loghost_new'):
+    if 'loghost_new' in logger_config.daemon:
         _weblog.addHandler(_newwebh)
 
 # no more HTTP handler
@@ -230,11 +253,60 @@ class PandaLogger:
         self.params['User'] = user
         self.params['Type'] = type
 
-    def getLogger(self, lognm):
-        logh = getLoggerWrapper("panda.log.%s"%lognm)
+    def getLogger(self, lognm, log_level=None):
+        logh, newLogFlag = getLoggerWrapper("panda.log.%s" % lognm, True)
         logh.propagate = False
-        txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
-        txth.setLevel(logging.DEBUG)
+        tmpAttr = 'rotating_policy'
+        if tmpAttr in logger_config.daemon and logger_config.daemon[tmpAttr] == 'time':
+            # interval
+            tmpAttr = 'rotating_interval'
+            if tmpAttr in logger_config.daemon:
+                rotatingInterval = int(logger_config.daemon[tmpAttr])
+            else:
+                rotatingInterval = 24
+            # backup count
+            tmpAttr = 'rotating_backup_count'
+            if tmpAttr in logger_config.daemon:
+                backupCount = int(logger_config.daemon[tmpAttr])
+            else:
+                backupCount = 1
+            # handler with timed rotating
+            txth = logging.handlers.TimedRotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
+                                                    when='h',
+                                                    interval=rotatingInterval,
+                                                    backupCount=backupCount,
+                                                    utc=True)
+            if newLogFlag and rotateLog:
+                txth.doRollover()
+        elif tmpAttr in logger_config.daemon and logger_config.daemon[tmpAttr] == 'size':
+            # max bytes
+            tmpAttr = 'rotating_max_size'
+            if tmpAttr in logger_config.daemon:
+                maxSize = int(logger_config.daemon[tmpAttr])
+            else:
+                maxSize = 1024
+            maxSize *= (1024 * 1024)
+            # backup count
+            tmpAttr = 'rotating_backup_count'
+            if tmpAttr in logger_config.daemon:
+                backupCount = int(logger_config.daemon[tmpAttr])
+            else:
+                backupCount = 1
+            # handler with rotating based on size
+            txth = logging.handlers.RotatingFileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm),
+                                               maxBytes=maxSize,
+                                               backupCount=backupCount)
+            if newLogFlag and rotateLog:
+                txth.doRollover()
+        else:
+            txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
+        if log_level in ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET']:
+            log_level = getattr(logging, log_level)
+            if newLogFlag:
+                logh.setLevel(log_level)
+        else:
+            log_level = logging.DEBUG
+        txth.setLevel(log_level)
         txth.setFormatter(_formatter)
         logh.addHandler(txth)
         return logh
@@ -247,7 +319,7 @@ class PandaLogger:
         for pname in params.keys():
             self.params[pname] = params[pname]
         _allwebh.setParams(self.params)
-        if logger_config.daemon.has_key('loghost_new'):
+        if 'loghost_new' in logger_config.daemon:
             _newwebh.setParams(self.params)
 
     def getParam(self, pname):
@@ -256,12 +328,17 @@ class PandaLogger:
     # acquire lock for HTTP handler
     def lock(self):
         _allwebh.lockHandler()
-        if logger_config.daemon.has_key('loghost_new'):
+        if 'loghost_new' in logger_config.daemon:
             _newwebh.lockHandler()
 
     # release lock
     def release(self):
         _allwebh.releaseHandler()
-        if logger_config.daemon.has_key('loghost_new'):
+        if 'loghost_new' in logger_config.daemon:
             _newwebh.releaseHandler()
         
+    # rollover
+    @staticmethod
+    def doRollOver():
+        global rotateLog
+        rotateLog = True

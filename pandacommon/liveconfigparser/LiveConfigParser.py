@@ -16,7 +16,16 @@
 #
 
 import os
-from ConfigParser import ConfigParser, NoSectionError
+
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
+
+try:
+    from configparser import ConfigParser, NoSectionError
+except ImportError:
+    from ConfigParser import ConfigParser, NoSectionError
 
 class LiveConfigParser(ConfigParser):
     
@@ -38,7 +47,7 @@ class LiveConfigParser(ConfigParser):
             raise AttributeError("ConfigParser instance has no attribute '%s'" % a)
 
     # search for configs in standard places and read them
-    def read(self,fileName):
+    def read(self, fileName, config_url=None):
         confFiles = [
             # system
             '/etc/panda/%s' % fileName,
@@ -46,8 +55,14 @@ class LiveConfigParser(ConfigParser):
             os.path.expanduser('~/etc/panda/%s' % fileName),
             ]
         # use PANDA_HOME if it is defined
-        if os.environ.has_key('PANDA_HOME'):
+        if 'PANDA_HOME'in os.environ:
             confFiles.append('%s/etc/panda/%s' % (os.environ['PANDA_HOME'],fileName))
+        # read from URL
+        if config_url is not None:
+            try:
+                res = urlopen(config_url)
+            except Exception as e:
+                raise Exception('failed to load cfg from URL={0} since {1}'.format(config_url, str(e)))
+            ConfigParser.read_file(self, res)
         # read
-        ConfigParser.read(self,confFiles)
-        
+        ConfigParser.read(self, confFiles)
