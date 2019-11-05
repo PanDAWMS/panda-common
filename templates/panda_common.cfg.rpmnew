@@ -16,6 +16,7 @@ encoding_new=json
 monurlprefix=/logger/logger/query
 logdir=/var/log/panda
 nemitters=10
+migrated=True
 
 # logging level : CRITICAL, ERROR, WARNING, INFO, DEBUG, or NOTSET
 log_level=DEBUG
