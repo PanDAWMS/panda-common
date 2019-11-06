@@ -27,6 +27,7 @@ setup(
     url='https://twiki.cern.ch/twiki/bin/view/Atlas/PanDA',
     packages=find_packages(),
     install_requires=['configparser',
+                      'pytz'
                       ],
     data_files=[ 
                 ('etc/panda',  
