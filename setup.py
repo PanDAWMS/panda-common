@@ -15,7 +15,14 @@ if 'BUILD_NUMBER' in os.environ:
     release_version = '{0}.{1}'.format(release_version,os.environ['BUILD_NUMBER'])
 
 from setuptools import setup, find_packages
-        
+from setuptools.command.install import install as install_org
+
+# custom install to disable egg
+class install_panda (install_org):
+    def finalize_options (self):
+        install_org.finalize_options(self)
+        self.single_version_externally_managed = True
+
 setup(
     name="panda-common",
     version=release_version,
@@ -34,4 +41,7 @@ setup(
                  ['templates/panda_common.cfg.rpmnew']
                  ),
                 ],
+    cmdclass={
+        'install': install_panda,
+    }
 )

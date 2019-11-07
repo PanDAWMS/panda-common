@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.15 (11/7/2019)
+  * disabled egg
+
 * 0.0.12 (10/14/2019)
   * python 2 and 3
   * using pip

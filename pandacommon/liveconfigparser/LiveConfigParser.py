@@ -51,12 +51,14 @@ class LiveConfigParser(ConfigParser):
         confFiles = [
             # system
             '/etc/panda/%s' % fileName,
+            '/usr/etc/panda/%s' % fileName,
             # home dir
             os.path.expanduser('~/etc/panda/%s' % fileName),
             ]
         # use PANDA_HOME if it is defined
         if 'PANDA_HOME'in os.environ:
-            confFiles.append('%s/etc/panda/%s' % (os.environ['PANDA_HOME'],fileName))
+            confFiles.append('%s/etc/panda/%s' % (os.environ['PANDA_HOME'], fileName))
+            confFiles.append('%s/usr/etc/panda/%s' % (os.environ['PANDA_HOME'], fileName))
         # read from URL
         if config_url is not None:
             try:
