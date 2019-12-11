@@ -34,10 +34,11 @@ setup(
     url='https://twiki.cern.ch/twiki/bin/view/Atlas/PanDA',
     packages=find_packages(),
     install_requires=['configparser',
-                      'pytz'
+                      'pytz',
+                      'stomp.py',
                       ],
-    data_files=[ 
-                ('etc/panda',  
+    data_files=[
+                ('etc/panda',
                  ['templates/panda_common.cfg.rpmnew']
                  ),
                 ],
