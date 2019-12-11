@@ -2,8 +2,8 @@ import sys
 import time
 import datetime
 
-from ..pandalogger import PandaLogger
-from ..pandamsgbkr import MsgBkrUtils, MsgConsumer
+from pandacommon.pandalogger import PandaLogger
+from pandacommon.pandamsgbkr import MsgBkrUtils, MsgConsumer
 
 #-----------------------------------------------------------------------------
 
