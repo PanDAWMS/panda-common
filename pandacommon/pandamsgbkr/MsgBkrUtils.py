@@ -3,6 +3,12 @@ import socket
 import ssl
 import random
 import collections
+import time
+
+try:
+    from queue import Queue, Empty
+except ImportError:
+    from Queue import Queue, Empty
 
 import stomp
 
@@ -37,7 +43,7 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
 
 
 # message buffer
-class MsgBuffer(object):
+class MsgBuffer_x(object):
     """
     Global message buffer. Singleton for each queue name
     """
@@ -54,6 +60,9 @@ class MsgBuffer(object):
         # interal fifo
         self.__fifo = collections.deque()
 
+    def size(self):
+        return len(self.__fifo)
+
     def get(self):
         try:
             ret = self.__fifo.popleft()
@@ -63,6 +72,48 @@ class MsgBuffer(object):
 
     def put(self, obj):
         self.__fifo.append(obj)
+
+
+# message buffer
+class MsgBuffer(object):
+    """
+    Global message buffer. Singleton for each queue name
+    """
+
+    @staticmethod
+    def _initialize(self, name):
+        """
+        Write init here becuase of singleton
+        """
+        # name of the message queue
+        self.name = name
+        # interal fifo
+        self.__fifo = Queue()
+
+    def __new__(cls, name):
+        with _GLOBAL_LOCK:
+            if name not in _BUFFER_MAP:
+                inst = object.__new__(cls)
+                _BUFFER_MAP[name] = inst
+                cls._initialize(inst, name)
+            return _BUFFER_MAP[name]
+
+    def __init__(self, name):
+        # Do NOT write anything here becuase of singleton
+        pass
+
+    def size(self):
+        return self.__fifo.qsize()
+
+    def get(self):
+        try:
+            ret = self.__fifo.get(False)
+        except Empty:
+            ret = None
+        return ret
+
+    def put(self, obj):
+        self.__fifo.put(obj)
 
 
 # message object
@@ -120,12 +171,12 @@ class MsgListener(stomp.ConnectionListener):
         self.logger.info('{id} on_disconnected start'.format(id=self.sub_id))
         self.logger.info('{id} on_disconnected done'.format(id=self.sub_id))
 
+    def on_send(self, frame):
+        self.logger.info('on_send frame: {0} {1} "{2}"'.format(frame.cmd, frame.headers, frame.body))
+
     def on_message(self, headers, message):
         self.logger.info('{id} on_message start: {h} ; {m}'.format(id=self.sub_id, h=headers, m=message))
-        msg_obj = MsgObj(mb_proxy=self.mb_proxy, msg_id=headers['message-id'], data=message)
-        self.logger.debug('{id} on_message made message object: {h}'.format(id=self.sub_id, h=headers))
-        self.mb_proxy.msg_buffer.put(msg_obj)
-        self.logger.debug('{id} on_message put into buffer: {h}'.format(id=self.sub_id, h=headers))
+        self.mb_proxy._on_message(headers, message)
         self.logger.info('{id} on_message done: {h}'.format(id=self.sub_id, h=headers))
 
 
@@ -146,30 +197,29 @@ class MBProxy(object):
         # subscription ID
         self.sub_id = 'panda-MBProxy_{0}_{1}'.format(socket.getfqdn(), 0)
         # client ID
-        self.client_id = 'client_{0}'.format(self.sub_id)
+        self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # acknoledge mode
         self.ack_mode = ack_mode
         # associate message buffer
         self.msg_buffer = MsgBuffer(name=self.name)
         # message listener
-        self.listener = MsgListener(logger=logger, sub_id=self.sub_id, msg_buffer=self.msg_buffer)
+        self.listener = MsgListener(logger=logger, sub_id=self.sub_id, mb_proxy=self)
 
     def _ack(self, msg_id):
         if self.ack_mode in ['client', 'client-individual']:
-            self.conn.ack(msg_id, sub_id)
+            self.conn.ack(msg_id, self.sub_id)
             self.logger.debug('{mid} {id} ACKed'.format(mid=msg_id, id=self.sub_id))
 
     def _nack(self, msg_id):
         if self.ack_mode in ['client', 'client-individual']:
-            self.conn.nack(msg_id, sub_id)
+            self.conn.nack(msg_id, self.sub_id)
             self.logger.debug('{mid} {id} NACKed'.format(mid=msg_id, id=self.sub_id))
 
-    def _send(self, data):
-        """
-        send a message to queue
-        """
-        self.conn.send(destination=self.destination, body=data)
-        self.logger.debug('SEND to {dest}: {data}'.format(dest=self.destination, data=data))
+    def _on_message(self, headers, message):
+        msg_obj = MsgObj(mb_proxy=self, msg_id=headers['message-id'], data=message)
+        self.logger.debug('_on_message made message object: {h}'.format(h=headers))
+        self.msg_buffer.put(msg_obj)
+        self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
 
     def go(self):
         self.logger.debug('go called')
@@ -178,7 +228,56 @@ class MBProxy(object):
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 self.conn.start()
                 self.conn.connect(headers = {'client-id': self.client_id})
-                self.conn.subscribe(destination=queue, id=subscription_id, ack='client-individual')
+                self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
+                self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
+            else:
+                self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
+                                                                        self.conn_id, self.destination))
+        except Exception as e:
+            self.logger.error('falied to start connection to {0} {1} ; {2}: {3} '.format(
+                                            self.conn_id, self.destination, e.__class__.__name__, e))
+
+    def stop(self):
+        self.logger.debug('stop called')
+        self.conn.disconnect()
+        self.logger.info('disconnect from {0} {1}'.format(self.conn_id, self.destination))
+
+
+# message sender
+class MsgSender(MBProxy):
+
+    def __init__(self, *args, **kwargs):
+        MBProxy.__init__(self, *args, **kwargs)
+        # subscription ID
+        self.sub_id = 'panda-MsgSender_{0}_{1}'.format(socket.getfqdn(), 0)
+        # client ID
+        self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
+
+    def _on_message(self, headers, message):
+        self.logger.debug('_on_message drop message: {h} "{m}"'.format(h=headers, m=message))
+
+    def send(self, data):
+        """
+        send a message to queue
+        """
+        self.conn.send(destination=self.destination, body=data)
+        self.logger.debug('SEND to {dest}: {data}'.format(dest=self.destination, data=data))
+
+    def waste(self, duration=3):
+        """
+        drop all messages gotten during duration time
+        """
+        self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='auto')
+        time.sleep(duration)
+        self.conn.unsubscribe(id=self.sub_id)
+
+    def go(self):
+        self.logger.debug('go called')
+        try:
+            if not self.conn.is_connected():
+                self.conn.set_listener(self.listener.__class__.__name__, self.listener)
+                self.conn.start()
+                self.conn.connect(headers = {'client-id': self.client_id})
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
             else:
                 self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
