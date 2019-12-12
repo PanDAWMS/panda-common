@@ -1,4 +1,4 @@
-import logging, logging.handlers, string
+import logging
 from . import logger_config
 import threading
 try:
@@ -11,13 +11,13 @@ except ImportError:
     from urllib import urlencode
 import json
 import time
+import os
 
 # encodings
 JSON = 'json'
 URL = 'url'
 
 # set TZ for timestamp
-import os
 os.environ['TZ'] = 'UTC'
 
 # log rotation
@@ -32,7 +32,7 @@ def getLoggerWrapper(loggerName, checkNew=False):
     loggerMapLock.acquire()
     global loggerMap
     newFlag = False
-    if not loggerName in loggerMap:
+    if loggerName not in loggerMap:
         loggerMap[loggerName] = logging.getLogger(loggerName)
         newFlag = True
     loggerMapLock.release()
@@ -56,7 +56,7 @@ class _Emitter (threading.Thread):
 
     def getData(self, src, chunk_size=1024):
         """
-        Use this function for debug purposes in order to print 
+        Use this function for debug purposes in order to print
         out the response from the server
         """
         d = src.read(chunk_size)
@@ -71,7 +71,7 @@ class _Emitter (threading.Thread):
             h = httplib.HTTPConnection(self.host, self.port, timeout=1)
             url = self.url
             if self.method == "GET":
-                if (string.find(url, '?') >= 0):
+                if (url.find('?') >= 0):
                     sep = '&'
                 else:
                     sep = '?'
@@ -87,10 +87,10 @@ class _Emitter (threading.Thread):
             #for s in self.getData(response, 1024):
             #    print s
 
-        except:
+        except Exception:
             pass
         self.semaphore.release()
-        
+
 
 class _PandaHTTPLogHandler(logging.Handler):
     """
@@ -142,11 +142,11 @@ class _PandaHTTPLogHandler(logging.Handler):
         # truncate and clean the message from non-UTF-8 characters
         try:
             newrec['msg'] = newrec['msg'][:maxParamLength].decode('utf-8', 'ignore').encode('utf-8')
-        except:
+        except Exception:
             pass
         try:
             newrec['message'] = newrec['message'][:maxParamLength].decode('utf-8', 'ignore').encode('utf-8')
-        except:
+        except Exception:
             pass
         return newrec
 
@@ -168,7 +168,7 @@ class _PandaHTTPLogHandler(logging.Handler):
                 data = json.dumps(arr)
             else:
                 data = urlencode(self.mapLogRecord(record))
-            
+
             # try to lock Semaphore
             if self.mySemaphore.acquire(False):
                 # start Emitter
@@ -189,7 +189,7 @@ class _PandaHTTPLogHandler(logging.Handler):
     def releaseHandler(self):
         try:
             self.mylock.release()
-        except:
+        except Exception:
             pass
 
 # log level
@@ -208,24 +208,24 @@ _newweblog = getLoggerWrapper('panda.mon_new')
 _formatter = logging.Formatter('%(asctime)s %(name)-12s: %(levelname)-8s %(message)s')
 
 if len(_weblog.handlers) < 2:
-    
+
     _allwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost'],'http://%s'%logger_config.daemon['loghost'],
                                     logger_config.daemon['monport-apache'], logger_config.daemon['monurlprefix'],
                                     logger_config.daemon['method'], logger_config.daemon['encoding'])
     _allwebh.setLevel(logging.DEBUG)
     _allwebh.setFormatter(_formatter)
-    
+
     if 'loghost_new' in logger_config.daemon:
         _newwebh = _PandaHTTPLogHandler(logger_config.daemon['loghost_new'],'http://%s'%logger_config.daemon['loghost_new'],
                                         logger_config.daemon['monport-apache_new'], logger_config.daemon['monurlprefix'],
                                         logger_config.daemon['method_new'], logger_config.daemon['encoding_new'])
         _newwebh.setLevel(logging.DEBUG)
         _newwebh.setFormatter(_formatter)
-    
+
     _txth = logging.FileHandler('%s/panda.log'%logger_config.daemon['logdir'])
     _txth.setLevel(logging.DEBUG)
     _txth.setFormatter(_formatter)
-    
+
     _weblog.addHandler(_txth)   # if http log doesn't have a text handler it doesn't work
     _weblog.addHandler(_allwebh)
     if 'loghost_new' in logger_config.daemon:
@@ -245,7 +245,7 @@ class PandaLogger:
     ID       General usage ID (eg. pilot ID, scheduler ID). A string.
     type     Message type
     """
-    
+
     def __init__(self, pid=0, user='', id='', type=''):
         self.params = {}
         self.params['PandaID'] = pid
@@ -336,7 +336,7 @@ class PandaLogger:
         _allwebh.releaseHandler()
         if 'loghost_new' in logger_config.daemon:
             _newwebh.releaseHandler()
-        
+
     # rollover
     @staticmethod
     def doRollOver():
