@@ -43,7 +43,7 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
 
 
 # message buffer
-class MsgBuffer_x(object):
+class MsgBuffer(object):
     """
     Global message buffer. Singleton for each queue name
     """
@@ -74,8 +74,8 @@ class MsgBuffer_x(object):
         self.__fifo.append(obj)
 
 
-# message buffer
-class MsgBuffer(object):
+# message buffer using python Queue
+class MsgBuffer_Q(object):
     """
     Global message buffer. Singleton for each queue name
     """

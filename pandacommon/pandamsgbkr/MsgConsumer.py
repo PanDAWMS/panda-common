@@ -161,7 +161,7 @@ class MsgConsumerAgentBase(threading.Thread):
 
     def initialize(self):
         # fill in self.consumer_info_map accroding to config, plugins must be instantiated
-        # instanciate mb_proxy instances accorgind to config
+        # instantiate mb_proxy instances accorgind to config
         pass
 
     def stop(self):
