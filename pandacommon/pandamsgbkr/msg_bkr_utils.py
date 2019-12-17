@@ -12,6 +12,11 @@ except ImportError:
 
 import stomp
 
+from pandacommon.pandalogger import logger_utils
+
+
+# logger
+base_logger = logger_utils.setup_logger('msg_bkr_utils')
 
 # global lock
 _GLOBAL_LOCK = threading.Lock()
@@ -25,6 +30,7 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
     """
     get list of (conn_id, connection)
     """
+    tmp_logger = logger_utils.make_logger(base_logger, method_name='_get_connection_list')
     ssl_opts = {'use_ssl' : use_ssl,
                 'ssl_version' : ssl.PROTOCOL_TLSv1,
                 'ssl_cert_file' : cert_file,
@@ -32,13 +38,18 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
     conn_dict = dict()
     for host_port in host_port_list:
         host, port = host_port.split(':')
-        ip_list = socket.gethostbyname_ex(host)[-1]
-        for ip in ip_list:
-            conn_id = '{0}:{1}'.format(ip, port)
-            if conn_id not in conn_dict:
-                conn = stomp.Connection(host_and_ports = [(ip, port)], **ssl_opts)
-                conn_dict[conn_id] = conn
+        # ip_list = socket.gethostbyname_ex(host)[-1]
+        # for ip in ip_list:
+        #     conn_id = '{0}:{1}'.format(ip, port)
+        #     if conn_id not in conn_dict:
+        #         conn = stomp.Connection(host_and_ports = [(ip, port)], **ssl_opts)
+        #         conn_dict[conn_id] = conn
+        conn_id = host_port
+        if conn_id not in conn_dict:
+            conn = stomp.Connection(host_and_ports = [(host, port)], **ssl_opts)
+            conn_dict[conn_id] = conn
     ret_list = list(conn_dict.items())
+    tmp_logger.debug('got {0} connections to {1}'.format(len(ret_list), ' , '.join(conn_dict.keys())))
     return ret_list
 
 
@@ -48,17 +59,30 @@ class MsgBuffer(object):
     Global message buffer. Singleton for each queue name
     """
 
-    def __new__(cls, name):
-        with _GLOBAL_LOCK:
-            if name not in _BUFFER_MAP:
-                _BUFFER_MAP[name] = object.__new__(cls)
-            return _BUFFER_MAP[name]
-
-    def __init__(self, name):
+    @staticmethod
+    def _initialize(self, queue_name):
+        """
+        Write init here becuase of singleton
+        """
         # name of the message queue
-        self.name = name
+        self.queue_name = queue_name
+        # full name
+        self.full_name = '{0}:{1}'.format(queue_name)
         # interal fifo
         self.__fifo = collections.deque()
+
+    def __new__(cls, queue_name):
+        key = queue_name
+        with _GLOBAL_LOCK:
+            if key not in _BUFFER_MAP:
+                inst = object.__new__(cls)
+                _BUFFER_MAP[key] = inst
+                cls._initialize(inst, queue_name)
+            return _BUFFER_MAP[key]
+
+    def __init__(self, *args, **kwargs):
+        # Do NOT write anything here becuase of singleton
+        pass
 
     def size(self):
         return len(self.__fifo)
@@ -72,48 +96,6 @@ class MsgBuffer(object):
 
     def put(self, obj):
         self.__fifo.append(obj)
-
-
-# message buffer using python Queue
-class MsgBuffer_Q(object):
-    """
-    Global message buffer. Singleton for each queue name
-    """
-
-    @staticmethod
-    def _initialize(self, name):
-        """
-        Write init here becuase of singleton
-        """
-        # name of the message queue
-        self.name = name
-        # interal fifo
-        self.__fifo = Queue()
-
-    def __new__(cls, name):
-        with _GLOBAL_LOCK:
-            if name not in _BUFFER_MAP:
-                inst = object.__new__(cls)
-                _BUFFER_MAP[name] = inst
-                cls._initialize(inst, name)
-            return _BUFFER_MAP[name]
-
-    def __init__(self, name):
-        # Do NOT write anything here becuase of singleton
-        pass
-
-    def size(self):
-        return self.__fifo.qsize()
-
-    def get(self):
-        try:
-            ret = self.__fifo.get(False)
-        except Empty:
-            ret = None
-        return ret
-
-    def put(self, obj):
-        self.__fifo.put(obj)
 
 
 # message object
@@ -136,11 +118,11 @@ class MsgObj(object):
         self.data = data
 
     def __enter__(self):
-        self.__mb_proxy.logger.debug('sub_id={s} msg_id={m} MsgObj.__enter__ called'.format(s=self.sub_id, m=self.msg_id))
+        self.__mb_proxy.logger.debug('msg_id={m} MsgObj.__enter__ called'.format(m=self.msg_id))
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.__mb_proxy.logger.debug('sub_id={s} msg_id={m} MsgObj.__exit__ called'.format(s=self.sub_id, m=self.msg_id))
+        self.__mb_proxy.logger.debug('msg_id={m} MsgObj.__exit__ called'.format(m=self.msg_id))
         if exc_type or exc_value:
             # exception occurs, send nack
             self.__mb_proxy._nack(self.msg_id)
@@ -155,38 +137,36 @@ class MsgListener(stomp.ConnectionListener):
     Message listener of STOMP
     """
 
-    def __init__(self, logger, sub_id, mb_proxy, *args, **kwargs):
+    def __init__(self, mb_proxy, *args, **kwargs):
         # logger
-        self.logger = logger
-        # subscription ID
-        self.sub_id = sub_id
+        self.logger = logger_utils.make_logger(base_logger, token=mb_proxy.name, method_name='MsgListener')
         # associated messgage broker proxy
         self.mb_proxy = mb_proxy
 
     def on_error(self, headers, message):
-        self.logger.error('{id} on_error start: {h} ; {m}'.format(id=self.sub_id, h=headers, m=message))
-        self.logger.error('{id} on_error done: {h}'.format(id=self.sub_id, h=headers))
+        self.logger.error('on_error start: {h} "{m}"'.format(h=headers, m=message))
+        self.logger.error('on_error done: {h}'.format(h=headers))
 
     def on_disconnected(self):
-        self.logger.info('{id} on_disconnected start'.format(id=self.sub_id))
-        self.logger.info('{id} on_disconnected done'.format(id=self.sub_id))
+        self.logger.info('on_disconnected start')
+        self.logger.info('on_disconnected done')
 
     def on_send(self, frame):
-        self.logger.info('on_send frame: {0} {1} "{2}"'.format(frame.cmd, frame.headers, frame.body))
+        self.logger.debug('on_send frame: {0} {1} "{2}"'.format(frame.cmd, frame.headers, frame.body))
 
     def on_message(self, headers, message):
-        self.logger.info('{id} on_message start: {h} ; {m}'.format(id=self.sub_id, h=headers, m=message))
+        self.logger.debug('on_message start: {h} "{m}"'.format(h=headers, m=message))
         self.mb_proxy._on_message(headers, message)
-        self.logger.info('{id} on_message done: {h}'.format(id=self.sub_id, h=headers))
+        self.logger.debug('on_message done: {h}'.format(h=headers))
 
 
-# message broker proxy
+# message broker proxy for receiver
 class MBProxy(object):
 
-    def __init__(self, name, logger, host_port_list, destination,
-                    use_ssl=False, cert_file=None, key_file=None, ack_mode='client-individual'):
+    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
+                    username=None, passcode=None, wait=True, ack_mode='client-individual'):
         # logger
-        self.logger = logger
+        self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBProxy')
         # name of message queue
         self.name = name
         # connection; FIXME: how to choose a connection? Round-robin?
@@ -198,12 +178,15 @@ class MBProxy(object):
         self.sub_id = 'panda-MBProxy_{0}_{1}'.format(socket.getfqdn(), 0)
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
+        # connect parameters
+        self.connect_params = {'username': username, 'passcode': passcode, 'wait': wait,
+                                'headers': {'client-id': self.client_id}}
         # acknoledge mode
         self.ack_mode = ack_mode
         # associate message buffer
-        self.msg_buffer = MsgBuffer(name=self.name)
+        self.msg_buffer = MsgBuffer(queue_name=self.name)
         # message listener
-        self.listener = MsgListener(logger=logger, sub_id=self.sub_id, mb_proxy=self)
+        self.listener = MsgListener(mb_proxy=self)
 
     def _ack(self, msg_id):
         if self.ack_mode in ['client', 'client-individual']:
@@ -227,7 +210,7 @@ class MBProxy(object):
             if not self.conn.is_connected():
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 self.conn.start()
-                self.conn.connect(headers = {'client-id': self.client_id})
+                self.conn.connect(**self.connect_params)
                 self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
             else:
@@ -243,15 +226,29 @@ class MBProxy(object):
         self.logger.info('disconnect from {0} {1}'.format(self.conn_id, self.destination))
 
 
-# message sender
-class MsgSender(MBProxy):
+# message broker proxy for sender, waster...
+class MBSenderProxy(object):
 
-    def __init__(self, *args, **kwargs):
-        MBProxy.__init__(self, *args, **kwargs)
+    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
+                    username=None, passcode=None, wait=True):
+        # logger
+        self.logger = logger_utils.make_logger(base_logger, token=self.name, method_name='MBSenderProxy')
+        # name of message queue
+        self.name = name
+        # connection; FIXME: how to choose a connection? Round-robin?
+        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file)
+        self.conn_id, self.conn = random.choice(conn_list)
+        # destination queue to subscribe
+        self.destination = destination
         # subscription ID
-        self.sub_id = 'panda-MsgSender_{0}_{1}'.format(socket.getfqdn(), 0)
+        self.sub_id = 'panda-MBSenderProxy_{0}_{1}'.format(socket.getfqdn(), 0)
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
+        # connect parameters
+        self.connect_params = {'username': username, 'passcode': passcode, 'wait': wait,
+                                'headers': {'client-id': self.client_id}}
+        # message listener
+        self.listener = MsgListener(mb_proxy=self)
 
     def _on_message(self, headers, message):
         self.logger.debug('_on_message drop message: {h} "{m}"'.format(h=headers, m=message))
@@ -261,7 +258,7 @@ class MsgSender(MBProxy):
         send a message to queue
         """
         self.conn.send(destination=self.destination, body=data)
-        self.logger.debug('SEND to {dest}: {data}'.format(dest=self.destination, data=data))
+        self.logger.debug('send to {dest} "{data}"'.format(dest=self.destination, data=data))
 
     def waste(self, duration=3):
         """
@@ -270,6 +267,7 @@ class MsgSender(MBProxy):
         self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='auto')
         time.sleep(duration)
         self.conn.unsubscribe(id=self.sub_id)
+        self.logger.debug('waste dropped messages for {t} sec'.format(t=duration))
 
     def go(self):
         self.logger.debug('go called')
@@ -277,7 +275,7 @@ class MsgSender(MBProxy):
             if not self.conn.is_connected():
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 self.conn.start()
-                self.conn.connect(headers = {'client-id': self.client_id})
+                self.conn.connect(**self.connect_params)
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
             else:
                 self.logger.info('connection to {0} {1} already exists. Skipped...'.format(

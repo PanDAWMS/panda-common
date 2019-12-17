@@ -1,89 +1,108 @@
 import sys
 import time
 import datetime
+import tempfile
 
 from pandacommon.pandalogger.PandaLogger import PandaLogger
-from pandacommon.pandamsgbkr import MsgBkrUtils, MsgConsumer
+from pandacommon.pandamsgbkr import MsgBkrUtils, MsgProcessor
 
 #-----------------------------------------------------------------------------
 
-CONFIG_CONSUMER_PLUGIN_MAP = {
-                                'C1': ('TestMsgConsumerPlugin_1', 'queue1'),
-                                'C2': ('TestMsgConsumerPlugin_2', 'queue2'),
-                            }
-
-
-CONFIG_CONSUMER_QUEUE_MAP = {
-                                'queue1': { 'host_port_list': ['127.0.0.1:61613'],
-                                            'destination': '/queue/test_1',
-                                            'use_ssl': False,
-                                            'cert_file': None,
-                                            'key_file': None},
-                                'queue2': { 'host_port_list': ['127.0.0.1:61613'],
-                                            'destination': '/queue/test_2',
-                                            'use_ssl': False,
-                                            'cert_file': None,
-                                            'key_file': None},
-                            }
+CONFIG_JSON = """
+{
+    "mb_servers": {
+        "local": {
+            "host_port_list": ['127.0.0.1:61613'],
+            "destination": '/queue/test_1',
+            "use_ssl": False,
+            "cert_file": None,
+            "key_file": None,
+            "username": "admin",
+            "passcode": "pw"}
+        }
+    },
+    "queues": {
+        "Q1": {
+            "server": "local",
+            "destination": "/queue/test_1"
+        },
+        "Q2": {
+            "server": "local",
+            "destination": "/queue/test_2"
+        },
+        "Q3": {
+            "server": "local",
+            "destination": "/queue/test_3"
+        }
+    },
+    "processors": {
+        "P1": {
+            "module": "pandacommon.pandamsgbkr.msg_processor",
+            "name": "TestMsgProcessorPlugin_1",
+            "in_queue": "Q1",
+            "out_queue": "Q3"
+        },
+        "P2": {
+            "module": "pandacommon.pandamsgbkr.msg_processor",
+            "name": "TestMsgProcessorPlugin_2",
+            "in_queue": "Q2",
+            "out_queue": "Q3"
+        }
+    }
+}
+"""
 
 
 #-----------------------------------------------------------------------------
 
 # loggers
-logger = MsgConsumer.some_logger
+logger = MsgProcessor.some_logger
 sender_logger = PandaLogger().getLogger('mb_test_sender', log_level='DEBUG')
 
 
 # verification set
 test_set_1 = set()
 test_set_2 = set()
+test_set_3 = set()
 answer_set_1 = { 'A{0}'.format(i) for i in range(20) }
 answer_set_2 = { 'B{0}'.format(i) for i in range(20) }
+answer_set_3 = answer_set_1 + answer_set_2
 
 
 # class
 
-class TestMsgConsumerPlugin_1(MsgConsumer.MsgConsumerPluginBase):
+class TestMsgProcessorPlugin_1(MsgProcessor.MsgProcessorPluginBase):
 
     def initialize(self):
-        logger.debug('TestMsgConsumerPlugin_1.initialize called')
+        logger.debug('TestMsgProcessorPlugin_1.initialize called')
 
-    def consume(self, msg_obj):
-        logger.debug('TestMsgConsumerPlugin_1.consume called')
+    def process(self, msg_obj):
+        logger.debug('TestMsgProcessorPlugin_1.process called')
         test_set_1.add(msg_obj.data)
         logger.info('got message obj: sub_id={s}, msg_id={m}, data={d}'.format(
                         s=msg_obj.sub_id, m=msg_obj.msg_id, d=msg_obj.data))
+        return msg_obj.data
 
 
-class TestMsgConsumerPlugin_2(MsgConsumer.MsgConsumerPluginBase):
+class TestMsgProcessorPlugin_2(MsgProcessor.MsgProcessorPluginBase):
 
     def initialize(self):
-        logger.debug('TestMsgConsumerPlugin_2.initialize called')
+        logger.debug('TestMsgProcessorPlugin_2.initialize called')
 
-    def consume(self, msg_obj):
-        logger.debug('TestMsgConsumerPlugin_2.consume called')
+    def process(self, msg_obj):
+        logger.debug('TestMsgProcessorPlugin_2.process called')
         test_set_2.add(msg_obj.data)
         logger.info('got message obj: sub_id={s}, msg_id={m}, data={d}'.format(
                         s=msg_obj.sub_id, m=msg_obj.msg_id, d=msg_obj.data))
+        return msg_obj.data
 
-class TestMsgConsumerAgent(MsgConsumer.MsgConsumerAgentBase):
+
+class TestMsgProcessorAgent(MsgProcessor.MsgProcessorAgentBase):
 
     def initialize(self):
-        logger.debug('TestMsgConsumerAgent.initialize called')
-        self.init_consumer_list = list(CONFIG_CONSUMER_PLUGIN_MAP.keys())
-        self.consumer_info_map = dict(CONFIG_CONSUMER_PLUGIN_INST_MAP)
+        logger.debug('TestMsgProcessorAgent.initialize called')
+        pass
 
-        init_queue_set = set(CONFIG_CONSUMER_QUEUE_MAP.keys())
-
-        self.init_mb_proxy_list = [ MsgBkrUtils.MBProxy(name=queue, logger=logger,
-                                                        **CONFIG_CONSUMER_QUEUE_MAP[queue])
-                                        for queue in init_queue_set ]
-
-
-CONFIG_CONSUMER_PLUGIN_INST_MAP = {
-                                'C1': (TestMsgConsumerPlugin_1(), 'queue1'),
-                                'C2': (TestMsgConsumerPlugin_2(), 'queue2'),
-                            }
 
 def main():
     # start
@@ -91,10 +110,10 @@ def main():
     sys.stderr.flush()
 
     # senders
-    sys.stderr.write('Start senders ...')
+    sys.stderr.write('Start extra senders ...')
     sys.stderr.flush()
-    sender_1 = MsgBkrUtils.MsgSender(name='queue1', logger=sender_logger, **CONFIG_CONSUMER_QUEUE_MAP['queue1'])
-    sender_2 = MsgBkrUtils.MsgSender(name='queue2', logger=sender_logger, **CONFIG_CONSUMER_QUEUE_MAP['queue2'])
+    sender_1 = MsgBkrUtils.MBSenderProxy(name='queue1', logger=sender_logger, **CONFIG_CONSUMER_QUEUE_MAP['queue1'])
+    sender_2 = MsgBkrUtils.MBSenderProxy(name='queue2', logger=sender_logger, **CONFIG_CONSUMER_QUEUE_MAP['queue2'])
     sender_1.go()
     sender_2.go()
     sys.stderr.write('\t OK! \n')
@@ -114,11 +133,14 @@ def main():
         sender_2.send('B{0}'.format(i))
     sys.stderr.write('\t\t OK! \n')
 
-    # consumer agent
-    sys.stderr.write('Run consumer agent ...')
+    # processor agent
+    sys.stderr.write('Run processor agent ...')
     sys.stderr.flush()
-    consumer_agent = TestMsgConsumerAgent()
-    consumer_agent.start()
+    temp_conifg = tempfile.NamedTemporaryFile(mode='w+t')
+    temp_conifg.write(CONFIG_JSON)
+    temp_conifg.flush()
+    processor_agent = TestMsgProcessorAgent(config_file=temp_conifg.name)
+    processor_agent.start()
     time.sleep(5)
     sys.stderr.write('\t OK! \n')
 
@@ -137,31 +159,27 @@ def main():
     sender_2.stop()
     sys.stderr.write('\t OK! \n')
 
-    # kill threads
+    # stop threads and agent
     time.sleep(2)
-    sys.stderr.write('Killing threads ...')
+    processor_agent.stop()
+    sys.stderr.write('Stop agent ...')
     sys.stderr.flush()
-    consumer_agent._kill_consumers(consumer_agent.init_consumer_list)
-    consumer_agent._kill_listeners(consumer_agent.init_mb_proxy_list)
-    sys.stderr.write('\t OK! \n')
-
-    # wait
-    sys.stderr.write('Waiting agent to stop...')
-    sys.stderr.flush()
-    while consumer_agent.is_alive():
+    while processor_agent.is_alive():
         time.sleep(2)
-    sys.stderr.write(' OK! \n')
+    temp_conifg.close()
+    sys.stderr.write('\t OK! \n')
 
     # verify
     sys.stderr.write('Verify result...')
     sys.stderr.flush()
-    while consumer_agent.is_alive():
+    while processor_agent.is_alive():
         time.sleep(2)
-    if answer_set_1 == test_set_1 and answer_set_2 == test_set_2:
+    if answer_set_1 == test_set_1 and answer_set_2 == test_set_2 and answer_set_3 == test_set_3:
         sys.stderr.write('\t OK! \n')
     else:
         print(answer_set_1, test_set_1)
         print(answer_set_2, test_set_2)
+        print(answer_set_3, test_set_3)
         sys.stderr.write('\t Failed! Check logs for details \n')
 
     # end
