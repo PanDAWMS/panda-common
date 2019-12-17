@@ -205,7 +205,8 @@ class MBProxy(object):
         self.logger.debug('_on_message made message object: {h}'.format(h=headers))
         if self.skip_buffer:
             self.logger.debug('_on_message (buffer_skipped) dump the message: {h}'.format(h=headers))
-            self.dump_msgs.append(message)
+            self.dump_msgs.append(msg_obj.data)
+            self._ack(msg_obj.msg_id)
         else:
             self.msg_buffer.put(msg_obj)
             self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))

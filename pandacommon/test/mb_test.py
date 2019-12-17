@@ -196,10 +196,10 @@ def main():
     sys.stderr.write('Verify result...')
     sys.stderr.flush()
     test_set = set(receiver_3.dump_msgs)
-    if answer_set_3 == test_set:
+    if answer_set_3 == test_set and len(receiver_3.dump_msgs) == len(answer_set_3):
         sys.stderr.write('\t OK! \n')
     else:
-        print(answer_set_3, test_set)
+        print(answer_set_3, receiver_3.dump_msgs)
         sys.stderr.write('\t Failed! Check logs for details \n')
 
     # end
