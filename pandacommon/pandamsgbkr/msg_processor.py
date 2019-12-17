@@ -4,9 +4,10 @@ import socket
 import json
 import logging
 
-from .MsgBkrUtils import MsgBuffer, MBProxy, MBSenderProxy
+from .msg_bkr_utils import MsgBuffer, MBProxy, MBSenderProxy
 from pandacommon.pandautils.thread_utils import GenericThread
 from pandacommon.pandautils.plugin_factory import PluginFactory
+from pandacommon.pandalogger import logger_utils
 
 # logger
 base_logger = logger_utils.setup_logger('msg_processor')
@@ -47,7 +48,8 @@ class MultiMsgProcPluginBase(object):
     Base class of multi-message processor plugin
     For multi-in-multi-out message processor thread
     """
-    raise NotImplementedError
+    # TODO
+    pass
 
 
 # simple message processor thread
@@ -119,7 +121,8 @@ class MultiMsgProcThread(GenericThread):
     """
     Thread of multi-message processor of certain plugin
     """
-    raise NotImplementedError
+    # TODO
+    pass
 
 
 # message processing agent base
@@ -150,9 +153,9 @@ class MsgProcAgentBase(GenericThread):
         Typical example dict from config json:
         mb_servers_dict = {
                 'Server_1': {
-                    'hostport': ['192.168.0.1:777', '192.168.0.2:777'],
+                    'host_port_list': ['192.168.0.1:777', '192.168.0.2:777'],
                     'use_ssl': True,
-                    'cern_file': 'aaa.cert.pem',
+                    'cert_file': 'aaa.cert.pem',
                     'key_file': 'bbb.key.pem',
                     'username': 'someuser',
                     'passcode': 'xxxxyyyyzzzz',
@@ -190,7 +193,7 @@ class MsgProcAgentBase(GenericThread):
         # inward/outward queues and plugin instances
         in_q_set = set()
         out_q_set = set()
-        for proc, pconf in processor_dict:
+        for proc, pconf in processors_dict.items():
             # queues
             in_queue = pconf.get('in_queue')
             out_queue = pconf.get('out_queue')
@@ -211,9 +214,9 @@ class MsgProcAgentBase(GenericThread):
         mb_proxy_dict = dict()
         for in_queue in in_q_set:
             qconf = queues_dict[in_queue]
-            sconf = mb_servers_dict[qconf[server]]
+            sconf = mb_servers_dict[qconf['server']]
             mb_proxy = MBProxy(name=in_queue,
-                                host_port_list=sconf['hostport'],
+                                host_port_list=sconf['host_port_list'],
                                 destination=qconf['destination'],
                                 use_ssl=sconf['use_ssl'],
                                 cert_file=sconf['cert_file'],
@@ -226,9 +229,9 @@ class MsgProcAgentBase(GenericThread):
         mb_sender_proxy_dict = dict()
         for out_queue in out_q_set:
             qconf = queues_dict[out_queue]
-            sconf = mb_servers_dict[qconf[server]]
+            sconf = mb_servers_dict[qconf['server']]
             mb_sender_proxy = MBSenderProxy(name=out_queue,
-                                            host_port_list=sconf['hostport'],
+                                            host_port_list=sconf['host_port_list'],
                                             destination=qconf['destination'],
                                             use_ssl=sconf['use_ssl'],
                                             cert_file=sconf['cert_file'],
@@ -238,13 +241,13 @@ class MsgProcAgentBase(GenericThread):
                                             wait=True)
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
-        for proc in processor_dict.keys():
+        for proc in processors_dict.keys():
             in_queue = processor_attr_map[proc]['in_queue']
             out_queue = processor_attr_map[proc]['out_queue']
             processor_attr_map[proc]['mb_proxy'] = mb_proxy_dict[in_queue]
             processor_attr_map[proc]['mb_sender_proxy'] = mb_sender_proxy_dict[out_queue]
         # set self attributes
-        self.init_processor_list = list(processor_dict.keys())
+        self.init_processor_list = list(processors_dict.keys())
         self.init_mb_proxy_list = list(mb_proxy_dict.values())
         self.init_mb_sender_proxy_list = list(mb_sender_proxy_dict.values())
         self.processor_attr_map = dict(processor_attr_map)
@@ -274,22 +277,22 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info('signaled stop to listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
-    def _spawn_sender(self, mb_sender_proxy_list):
+    def _spawn_senders(self, mb_sender_proxy_list):
         """
         spawn connection/listener threads of certain message broker proxy
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.class_name, method_name='_spawn_sender')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.class_name, method_name='_spawn_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             mb_proxy.go()
             tmp_logger.info('spawned listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
-    def _kill_sender(self, mb_sender_proxy_list):
+    def _kill_senders(self, mb_sender_proxy_list):
         """
         kill connection/listener threads of certain message broker proxy
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.class_name, method_name='_kill_sender')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.class_name, method_name='_kill_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             mb_proxy.stop()
@@ -308,11 +311,13 @@ class MsgProcAgentBase(GenericThread):
                 self.processor_thread_map[processor_name] = SimpleMsgProcThread(attr_dict)
                 mc_thread = self.processor_thread_map[processor_name]
                 mc_thread.start()
-                tmp_logger.info('spawned processors thread {0} with plugin={1} , mq={2}'.format(
-                                                processor_name, plugin.__class__.__name__, queue_name))
+                tmp_logger.info('spawned processors thread {0} with plugin={1} , in_q={2}, out_q={3}'.format(
+                                                processor_name, attr_dict['plugin'].__class__.__name__,
+                                                attr_dict['in_queue'], attr_dict['out_queue']))
             except Exception as e:
-                tmp_logger.error('falied to spawn processor thread {0} with plugin={1} , mq={2} ; {3}: {4} '.format(
-                                                processor_name, plugin.__class__.__name__, queue_name, e.__class__.__name__, e))
+                tmp_logger.error('falied to spawn processor thread {0} with plugin={1} , in_q={2}, out_q={3} ; {4}: {5} '.format(
+                                                processor_name, attr_dict['plugin'].__class__.__name__,
+                                                attr_dict['in_queue'], attr_dict['out_queue'], e.__class__.__name__, e))
         tmp_logger.debug('done')
 
     def _kill_processors(self, processor_list, block=True):
@@ -380,7 +385,7 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger.debug('looping')
         while self.__to_run:
             # TODO: monitor ?!
-            sleep(1)
+            time.sleep(1)
         # tear down
         tmp_logger.debug('tearing down')
         # kill all message broker proxy threads

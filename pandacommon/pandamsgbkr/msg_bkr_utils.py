@@ -66,8 +66,6 @@ class MsgBuffer(object):
         """
         # name of the message queue
         self.queue_name = queue_name
-        # full name
-        self.full_name = '{0}:{1}'.format(queue_name)
         # interal fifo
         self.__fifo = collections.deque()
 
@@ -164,7 +162,7 @@ class MsgListener(stomp.ConnectionListener):
 class MBProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
-                    username=None, passcode=None, wait=True, ack_mode='client-individual'):
+                    username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBProxy')
         # name of message queue
@@ -187,6 +185,10 @@ class MBProxy(object):
         self.msg_buffer = MsgBuffer(queue_name=self.name)
         # message listener
         self.listener = MsgListener(mb_proxy=self)
+        # whether to skip buffer and dump to self.dump_msgs; True only in testing
+        self.skip_buffer = skip_buffer
+        # dump messages
+        self.dump_msgs = []
 
     def _ack(self, msg_id):
         if self.ack_mode in ['client', 'client-individual']:
@@ -201,8 +203,12 @@ class MBProxy(object):
     def _on_message(self, headers, message):
         msg_obj = MsgObj(mb_proxy=self, msg_id=headers['message-id'], data=message)
         self.logger.debug('_on_message made message object: {h}'.format(h=headers))
-        self.msg_buffer.put(msg_obj)
-        self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
+        if self.skip_buffer:
+            self.logger.debug('_on_message (buffer_skipped) dump the message: {h}'.format(h=headers))
+            self.dump_msgs.append(message)
+        else:
+            self.msg_buffer.put(msg_obj)
+            self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
 
     def go(self):
         self.logger.debug('go called')
@@ -232,7 +238,7 @@ class MBSenderProxy(object):
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
                     username=None, passcode=None, wait=True):
         # logger
-        self.logger = logger_utils.make_logger(base_logger, token=self.name, method_name='MBSenderProxy')
+        self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBSenderProxy')
         # name of message queue
         self.name = name
         # connection; FIXME: how to choose a connection? Round-robin?
