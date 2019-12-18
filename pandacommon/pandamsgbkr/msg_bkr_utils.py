@@ -137,7 +137,8 @@ class MsgListener(stomp.ConnectionListener):
 
     def __init__(self, mb_proxy, *args, **kwargs):
         # logger
-        self.logger = logger_utils.make_logger(base_logger, token=mb_proxy.name, method_name='MsgListener')
+        _token = '{0}-{1}'.format(mb_proxy.__class__.__name__, mb_proxy.name)
+        self.logger = logger_utils.make_logger(base_logger, token=_token, method_name='MsgListener')
         # associated messgage broker proxy
         self.mb_proxy = mb_proxy
 
