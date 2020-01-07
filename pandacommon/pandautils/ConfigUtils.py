@@ -22,6 +22,5 @@ def expandConfig(configFileName,sectionName,moduleName):
                 tmpVal = int(tmpVal)
             # update dict
             tmpSelf.__dict__[tmpKey] = tmpVal
-    except:
+    except Exception:
         pass
-    

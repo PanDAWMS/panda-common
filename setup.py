@@ -5,17 +5,20 @@
 #
 # set PYTHONPATH to use the current directory first
 import sys
-sys.path.insert(0,'.')
+sys.path.insert(0,'.')  # noqa: E402
+
+import os
+
+import PandaPkgInfo
+from setuptools import setup, find_packages
+from setuptools.command.install import install as install_org
+
 
 # get release version
-import os
-import PandaPkgInfo
 release_version = PandaPkgInfo.release_version
 if 'BUILD_NUMBER' in os.environ:
     release_version = '{0}.{1}'.format(release_version,os.environ['BUILD_NUMBER'])
 
-from setuptools import setup, find_packages
-from setuptools.command.install import install as install_org
 
 # custom install to disable egg
 class install_panda (install_org):
@@ -34,10 +37,11 @@ setup(
     url='https://twiki.cern.ch/twiki/bin/view/Atlas/PanDA',
     packages=find_packages(),
     install_requires=['configparser',
-                      'pytz'
+                      'pytz',
+                      'stomp.py',
                       ],
-    data_files=[ 
-                ('etc/panda',  
+    data_files=[
+                ('etc/panda',
                  ['templates/panda_common.cfg.rpmnew']
                  ),
                 ],

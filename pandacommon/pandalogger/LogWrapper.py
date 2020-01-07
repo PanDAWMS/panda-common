@@ -6,8 +6,8 @@ from .PandaLogger import PandaLogger
 # wrapper to set prefix to logging messages
 class LogWrapper:
     def __init__(self,log,prefix='',lineLimit=100,monToken=None,seeMem=False,hook=None):
-        # use timestamp as prefix 
-        if prefix == None:
+        # use timestamp as prefix
+        if prefix is None:
             self.prefix = datetime.datetime.utcnow().isoformat('/')
         else:
             self.prefix = prefix
@@ -17,7 +17,7 @@ class LogWrapper:
         self.msgBuffer = []
         self.lineLimit = lineLimit
         # token for monitor
-        if monToken != None:
+        if monToken is not None:
             self.monToken = monToken
         else:
             self.monToken = self.prefix
@@ -25,10 +25,10 @@ class LogWrapper:
         self.hook = hook
         try:
             self.name = self.logger.name.split('.')[-1]
-        except:
+        except Exception:
             self.name = ''
 
-    
+
     # get memory usage
     def getMemoryUsage(self):
         return ' (mem usage {0} MB)'.format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
@@ -48,7 +48,7 @@ class LogWrapper:
         try:
             if self.hook is not None:
                 self.hook.add_dialog_message(msg, 'DEBUG', self.name, self.prefix)
-        except:
+        except Exception:
             pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
@@ -62,12 +62,12 @@ class LogWrapper:
         try:
             if self.hook is not None:
                 self.hook.add_dialog_message(msg, 'INFO', self.name, self.prefix)
-        except:
+        except Exception:
             pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
         if self.seeMem:
-            msg += self.getMemoryUsage()        
+            msg += self.getMemoryUsage()
         self.logger.info(msg)
 
     def error(self,msg):
@@ -76,7 +76,7 @@ class LogWrapper:
         try:
             if self.hook is not None:
                 self.hook.add_dialog_message(msg, 'ERROR', self.name, self.prefix)
-        except:
+        except Exception:
             pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
@@ -90,7 +90,7 @@ class LogWrapper:
         try:
             if self.hook is not None:
                 self.hook.add_dialog_message(msg, 'WARNING', self.name, self.prefix)
-        except:
+        except Exception:
             pass
         if self.prefix != '':
             msg = self.prefix + ' ' + str(msg)
@@ -106,7 +106,7 @@ class LogWrapper:
             strMsg += "\n"
         return strMsg
 
-            
+
     # send message to logger
     def sendMsg(self,message,loggerName,msgType,msgLevel='info'):
         try:
@@ -127,7 +127,7 @@ class LogWrapper:
                 tmpLogger.info(message)
             else:
                 tmpLogger.debug(message)
-        except:
+        except Exception:
             pass
         finally:
             # release HTTP handler
