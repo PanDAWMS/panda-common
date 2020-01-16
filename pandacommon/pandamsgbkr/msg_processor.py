@@ -390,8 +390,8 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger.debug('tearing down')
         # kill all message broker proxy threads
         self._kill_listeners(self.init_mb_proxy_list)
-        # spawn all message broker sender proxy threads
+        # kill all message broker sender proxy threads
         self._kill_senders(self.init_mb_sender_proxy_list)
-        # spawn all processor threads according to config
+        # kill all processor threads according to config
         self._kill_processors(self.init_processor_list)
         tmp_logger.debug('done')
