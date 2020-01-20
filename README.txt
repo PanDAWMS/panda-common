@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.17 (1/20/2019)
+  * added msg stuff 
+  
 * 0.0.15 (11/7/2019)
   * disabled egg
 
