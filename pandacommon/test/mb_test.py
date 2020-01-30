@@ -154,8 +154,8 @@ def main():
     # extra receiver
     sys.stderr.write('Start extra receiver ...')
     sys.stderr.flush()
-    receiver_3 = msg_bkr_utils.MBProxy(name='Q3', **EXTRA_PROXY_INFO['Q3'], skip_buffer=True)
-    receiver_4 = msg_bkr_utils.MBProxy(name='Q4', **EXTRA_PROXY_INFO['Q4'], skip_buffer=True)
+    receiver_3 = msg_bkr_utils.MBProxy(name='Q3', skip_buffer=True, **EXTRA_PROXY_INFO['Q3'])
+    receiver_4 = msg_bkr_utils.MBProxy(name='Q4', skip_buffer=True, **EXTRA_PROXY_INFO['Q4'])
     receiver_3.go()
     receiver_4.go()
     sys.stderr.write(' OK! \n')
