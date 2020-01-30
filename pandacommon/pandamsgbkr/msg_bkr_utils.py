@@ -46,7 +46,7 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
         #         conn_dict[conn_id] = conn
         conn_id = host_port
         if conn_id not in conn_dict:
-            conn = stomp.Connection(host_and_ports = [(host, port)], **ssl_opts)
+            conn = stomp.Connection12(host_and_ports = [(host, port)], **ssl_opts)
             conn_dict[conn_id] = conn
     ret_list = list(conn_dict.items())
     tmp_logger.debug('got {0} connections to {1}'.format(len(ret_list), ' , '.join(conn_dict.keys())))
@@ -217,7 +217,6 @@ class MBProxy(object):
         try:
             if not self.conn.is_connected():
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
-                self.conn.start()
                 self.conn.connect(**self.connect_params)
                 self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
@@ -282,7 +281,6 @@ class MBSenderProxy(object):
         try:
             if not self.conn.is_connected():
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
-                self.conn.start()
                 self.conn.connect(**self.connect_params)
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
             else:
