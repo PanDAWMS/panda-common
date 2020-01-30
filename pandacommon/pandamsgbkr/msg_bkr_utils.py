@@ -217,7 +217,6 @@ class MBProxy(object):
         try:
             if not self.conn.is_connected():
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
-                self.conn.start()
                 self.conn.connect(**self.connect_params)
                 self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
@@ -282,7 +281,6 @@ class MBSenderProxy(object):
         try:
             if not self.conn.is_connected():
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
-                self.conn.start()
                 self.conn.connect(**self.connect_params)
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
             else:

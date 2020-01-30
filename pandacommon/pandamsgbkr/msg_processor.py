@@ -63,8 +63,8 @@ class SimpleMsgProcThread(GenericThread):
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='SimpleMsgProcThread')
         self.__to_run = True
         self.plugin = attr_dict['plugin']
-        self.in_queue = attr_dict['in_queue']
-        self.mb_sender_proxy = attr_dict['mb_sender_proxy']
+        self.in_queue = attr_dict.get('in_queue')
+        self.mb_sender_proxy = attr_dict.get('mb_sender_proxy')
         self.sleep_time = sleep_time
 
     def run(self):
@@ -242,9 +242,11 @@ class MsgProcAgentBase(GenericThread):
         # keep filling in thread attribute dict
         for proc in processors_dict.keys():
             in_queue = processor_attr_map[proc]['in_queue']
+            if in_queue:
+                processor_attr_map[proc]['mb_proxy'] = mb_proxy_dict[in_queue]
             out_queue = processor_attr_map[proc]['out_queue']
-            processor_attr_map[proc]['mb_proxy'] = mb_proxy_dict[in_queue]
-            processor_attr_map[proc]['mb_sender_proxy'] = mb_sender_proxy_dict[out_queue]
+            if out_queue:
+                processor_attr_map[proc]['mb_sender_proxy'] = mb_sender_proxy_dict[out_queue]
         # set self attributes
         self.init_processor_list = list(processors_dict.keys())
         self.init_mb_proxy_list = list(mb_proxy_dict.values())
