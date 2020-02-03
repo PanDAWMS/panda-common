@@ -93,7 +93,7 @@ class SimpleMsgProcThread(GenericThread):
                             proc_ret = self.plugin.process(_msg_obj)
                     except Exception as e:
                         self.logger.error('error when process message msg_id={0} with {1}: {2} '.format(
-                                                        _msg_obj.msg_id , e.__class__.__name__, e))
+                                                            msg_obj.msg_id , e.__class__.__name__, e))
 
                     is_processed = True
                     self.logger.debug('plugin process end')
