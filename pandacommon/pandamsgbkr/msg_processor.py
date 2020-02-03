@@ -88,8 +88,13 @@ class SimpleMsgProcThread(GenericThread):
                 if msg_obj is not None:
                     self.logger.debug('received a new message')
                     self.logger.debug('plugin process start')
-                    with msg_obj as _msg_obj:
-                        proc_ret = self.plugin.process(_msg_obj)
+                    try:
+                        with msg_obj as _msg_obj:
+                            proc_ret = self.plugin.process(_msg_obj)
+                    except Exception as e:
+                        self.logger.error('error when process message msg_id={0} with {1}: {2} '.format(
+                                                        _msg_obj.msg_id , e.__class__.__name__, e))
+
                     is_processed = True
                     self.logger.debug('plugin process end')
             else:
