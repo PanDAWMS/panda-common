@@ -7,7 +7,10 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
-* 0.0.17 (1/20/2019)
+* 0.0.18 (2/4/2020)
+  * added HTTP Adaptor with random DNS resolution
+
+* 0.0.17 (1/20/2020)
   * added msg stuff 
   
 * 0.0.15 (11/7/2019)

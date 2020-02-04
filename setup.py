@@ -39,6 +39,7 @@ setup(
     install_requires=['configparser',
                       'pytz',
                       'stomp.py',
+                      'requests',
                       ],
     data_files=[
                 ('etc/panda',
