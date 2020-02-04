@@ -103,15 +103,17 @@ class MsgObj(object):
     Support with-statement
     """
 
-    __slots__ = ('__mb_proxy', 'sub_id', 'msg_id', 'data')
+    __slots__ = ('__mb_proxy', 'sub_id', 'msg_id', 'ack_id', 'data')
 
-    def __init__(self, mb_proxy, msg_id, data):
+    def __init__(self, mb_proxy, msg_id, ack_id, data):
         # associated proxy object
         self.__mb_proxy = mb_proxy
         # subscription ID
         self.sub_id = self.__mb_proxy.sub_id
         # message ID
         self.msg_id = msg_id
+        # ack ID
+        self.ack_id = ack_id
         # real message data
         self.data = data
 
@@ -123,10 +125,10 @@ class MsgObj(object):
         self.__mb_proxy.logger.debug('msg_id={m} MsgObj.__exit__ called'.format(m=self.msg_id))
         if exc_type or exc_value:
             # exception occurs, send nack
-            self.__mb_proxy._nack(self.msg_id)
+            self.__mb_proxy._nack(self.msg_id, self.ack_id)
         else:
             # done, send ack
-            self.__mb_proxy._ack(self.msg_id)
+            self.__mb_proxy._ack(self.msg_id, self.ack_id)
 
 
 # message listener
@@ -174,7 +176,7 @@ class MBProxy(object):
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
-        self.sub_id = 'panda-MBProxy_{0}_{1}'.format(socket.getfqdn(), 0)
+        self.sub_id = 'panda-MBProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
@@ -191,23 +193,23 @@ class MBProxy(object):
         # dump messages
         self.dump_msgs = []
 
-    def _ack(self, msg_id):
+    def _ack(self, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
-            self.conn.ack(msg_id, self.sub_id)
-            self.logger.debug('{mid} {id} ACKed'.format(mid=msg_id, id=self.sub_id))
+            self.conn.ack(ack_id)
+            self.logger.debug('{mid} {ackid} ACKed'.format(mid=msg_id, ackid=ack_id))
 
-    def _nack(self, msg_id):
+    def _nack(self, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
-            self.conn.nack(msg_id, self.sub_id)
-            self.logger.debug('{mid} {id} NACKed'.format(mid=msg_id, id=self.sub_id))
+            self.conn.nack(ack_id)
+            self.logger.debug('{mid} {ackid} NACKed'.format(mid=msg_id, ackid=ack_id))
 
     def _on_message(self, headers, message):
-        msg_obj = MsgObj(mb_proxy=self, msg_id=headers['message-id'], data=message)
+        msg_obj = MsgObj(mb_proxy=self, msg_id=headers['message-id'], ack_id=headers['ack'], data=message)
         self.logger.debug('_on_message made message object: {h}'.format(h=headers))
         if self.skip_buffer:
             self.logger.debug('_on_message (buffer_skipped) dump the message: {h}'.format(h=headers))
             self.dump_msgs.append(msg_obj.data)
-            self._ack(msg_obj.msg_id)
+            self._ack(msg_obj.msg_id, msg_obj.ack_id)
         else:
             self.msg_buffer.put(msg_obj)
             self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
@@ -248,7 +250,7 @@ class MBSenderProxy(object):
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
-        self.sub_id = 'panda-MBSenderProxy_{0}_{1}'.format(socket.getfqdn(), 0)
+        self.sub_id = 'panda-MBSenderProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
