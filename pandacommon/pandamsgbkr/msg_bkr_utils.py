@@ -46,7 +46,7 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
         #         conn_dict[conn_id] = conn
         conn_id = host_port
         if conn_id not in conn_dict:
-            conn = stomp.Connection12(host_and_ports = [(host, port)], **ssl_opts)
+            conn = stomp.Connection12(host_and_ports = [(host, int(port))], **ssl_opts)
             conn_dict[conn_id] = conn
     ret_list = list(conn_dict.items())
     tmp_logger.debug('got {0} connections to {1}'.format(len(ret_list), ' , '.join(conn_dict.keys())))

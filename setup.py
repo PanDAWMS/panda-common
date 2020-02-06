@@ -38,7 +38,7 @@ setup(
     packages=find_packages(),
     install_requires=['configparser',
                       'pytz',
-                      'stomp.py',
+                      'stomp.py>=4.1.23',
                       'requests',
                       ],
     data_files=[
