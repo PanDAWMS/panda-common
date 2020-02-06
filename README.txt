@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.19 (2/6/2020)
+  * fixed SSLCertVerificationError with hostname mismatch
+
 * 0.0.18 (2/4/2020)
   * added HTTP Adaptor with random DNS resolution
 

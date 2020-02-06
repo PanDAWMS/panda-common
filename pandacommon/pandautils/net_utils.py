@@ -36,16 +36,14 @@ class HTTPAdapterWithRandomDnsResolver (HTTPAdapter):
         else:
             family = allowed_gai_family()
             dnsRecord = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+            dnsRecord = list(set([socket.getfqdn(record[4][0]) for record in dnsRecord]))
             dnsMap[parsed.hostname] = dnsRecord
         dnsRecord = copy.copy(dnsRecord)
         random.shuffle(dnsRecord)
         # loop over all hosts
         err = None
-        for af, sock_type, proto, canon_name, sa in dnsRecord:
-            if af == socket.AF_INET6:
-                addr = '[' + sa[0] + ']'
-            else:
-                addr = sa[0]
+        for hostname in dnsRecord:
+            addr = hostname
             if parsed.port is not None:
                 addr += ':{0}'.format(parsed.port)
             tmp_url = parsed._replace(netloc=addr).geturl()
