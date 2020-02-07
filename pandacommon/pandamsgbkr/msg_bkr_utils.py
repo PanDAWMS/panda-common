@@ -4,6 +4,7 @@ import ssl
 import random
 import collections
 import time
+import copy
 
 try:
     from queue import Queue, Empty
@@ -153,7 +154,11 @@ class MsgListener(stomp.ConnectionListener):
         self.logger.info('on_disconnected done')
 
     def on_send(self, frame):
-        self.logger.debug('on_send frame: {0} {1} "{2}"'.format(frame.cmd, frame.headers, frame.body))
+        obscured_headers = frame.headers
+        if 'passcode' in frame.headers:
+            obscured_headers = copy.deepcopy(frame.headers)
+            obscured_headers['passcode'] = '********'
+        self.logger.debug('on_send frame: {0} {1} "{2}"'.format(frame.cmd, obscured_headers, frame.body))
 
     def on_message(self, headers, message):
         self.logger.debug('on_message start: {h} "{m}"'.format(h=headers, m=message))
