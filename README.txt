@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.20 (2/12/2020)
+  * fixed logging.handlers
+
 * 0.0.19 (2/6/2020)
   * fixed SSLCertVerificationError with hostname mismatch
 
