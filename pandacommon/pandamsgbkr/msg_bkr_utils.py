@@ -151,6 +151,7 @@ class MsgListener(stomp.ConnectionListener):
 
     def on_disconnected(self):
         self.logger.info('on_disconnected start')
+        self.mb_proxy._on_disconnected()
         self.logger.info('on_disconnected done')
 
     def on_send(self, frame):
@@ -197,6 +198,12 @@ class MBProxy(object):
         self.skip_buffer = skip_buffer
         # dump messages
         self.dump_msgs = []
+        # number of attempts to restart
+        self.n_restart = 0
+        # whether got disconnected from on_disconnected
+        self.got_disconnected = False
+        # whether to disconnect intentionally
+        self.to_disconnect = False
 
     def _ack(self, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
@@ -219,10 +226,16 @@ class MBProxy(object):
             self.msg_buffer.put(msg_obj)
             self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
 
+    def _on_disconnected(self):
+        self.logger.debug('_on_disconnected called')
+        self.got_disconnected = True
+
     def go(self):
         self.logger.debug('go called')
+        self.to_disconnect = False
         try:
             if not self.conn.is_connected():
+                self.got_disconnected = False
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 self.conn.connect(**self.connect_params)
                 self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
@@ -236,8 +249,17 @@ class MBProxy(object):
 
     def stop(self):
         self.logger.debug('stop called')
+        self.to_disconnect = True
         self.conn.disconnect()
         self.logger.info('disconnect from {0} {1}'.format(self.conn_id, self.destination))
+
+    def restart(self):
+        self.logger.debug('restart called')
+        self.n_restart += 1
+        self.logger.debug('the {0}th attempt to restart...'.format(self.n_restart))
+        self.stop()
+        self.go()
+        self.logger.info('the {0}th restart done'.format(self.n_restart))
 
 
 # message broker proxy for sender, waster...
@@ -263,9 +285,19 @@ class MBSenderProxy(object):
                                 'headers': {'client-id': self.client_id}}
         # message listener
         self.listener = MsgListener(mb_proxy=self)
+        # number of attempts to restart
+        self.n_restart = 0
+        # whether got disconnected from on_disconnected
+        self.got_disconnected = False
+        # whether to disconnect intentionally
+        self.to_disconnect = False
 
     def _on_message(self, headers, message):
         self.logger.debug('_on_message drop message: {h} "{m}"'.format(h=headers, m=message))
+
+    def _on_disconnected(self):
+        self.logger.debug('_on_disconnected called')
+        self.got_disconnected = True
 
     def send(self, data):
         """
@@ -285,8 +317,10 @@ class MBSenderProxy(object):
 
     def go(self):
         self.logger.debug('go called')
+        self.to_disconnect = False
         try:
             if not self.conn.is_connected():
+                self.got_disconnected = False
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 self.conn.connect(**self.connect_params)
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
@@ -299,5 +333,14 @@ class MBSenderProxy(object):
 
     def stop(self):
         self.logger.debug('stop called')
+        self.to_disconnect = True
         self.conn.disconnect()
         self.logger.info('disconnect from {0} {1}'.format(self.conn_id, self.destination))
+
+    def restart(self):
+        self.logger.debug('restart called')
+        self.n_restart += 1
+        self.logger.debug('the {0}th attempt to restart...'.format(self.n_restart))
+        self.stop()
+        self.go()
+        self.logger.info('the {0}th restart done'.format(self.n_restart))
