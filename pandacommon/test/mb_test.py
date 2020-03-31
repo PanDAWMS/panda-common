@@ -17,7 +17,8 @@ CONFIG_JSON = """
             "cert_file": null,
             "key_file": null,
             "username": "admin",
-            "passcode": "pw"
+            "passcode": "pw",
+            "vhost": null
         }
     },
     "queues": {
@@ -60,21 +61,25 @@ EXTRA_PROXY_INFO = {
         'host_port_list': ['127.0.0.1:61613'],
         'destination': '/queue/test_1',
         'use_ssl': False,
+        'vhost': None,
     },
     'Q2': {
         'host_port_list': ['127.0.0.1:61613'],
         'destination': '/queue/test_2',
         'use_ssl': False,
+        'vhost': None,
     },
     'Q3': {
         'host_port_list': ['127.0.0.1:61613'],
         'destination': '/queue/test_3',
         'use_ssl': False,
+        'vhost': None,
     },
     'Q4': {
         'host_port_list': ['127.0.0.1:61613'],
         'destination': '/queue/test_4',
         'use_ssl': False,
+        'vhost': None,
     },
 }
 

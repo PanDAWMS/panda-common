@@ -169,6 +169,7 @@ class MsgProcAgentBase(GenericThread):
                     'key_file': 'bbb.key.pem',
                     'username': 'someuser',
                     'passcode': 'xxxxyyyyzzzz',
+                    'vhost': '/somehost',
                 },
                 ...
             }
@@ -233,6 +234,7 @@ class MsgProcAgentBase(GenericThread):
                                 key_file=sconf['key_file'],
                                 username=sconf['username'],
                                 passcode=sconf['passcode'],
+                                vhost=sconf.get('vhost'),
                                 wait=True)
             mb_proxy_dict[in_queue] = mb_proxy
         # mb_sender_proxy instances
@@ -248,6 +250,7 @@ class MsgProcAgentBase(GenericThread):
                                             key_file=sconf['key_file'],
                                             username=sconf['username'],
                                             passcode=sconf['passcode'],
+                                            vhost=sconf.get('vhost'),
                                             wait=True)
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict

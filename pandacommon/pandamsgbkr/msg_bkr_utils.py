@@ -27,7 +27,7 @@ _BUFFER_MAP = dict()
 
 
 # get connection list
-def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file=None, force=False):
+def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, force=False):
     """
     get list of (conn_id, connection)
     """
@@ -47,7 +47,7 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
         #         conn_dict[conn_id] = conn
         conn_id = host_port
         if conn_id not in conn_dict:
-            conn = stomp.Connection12(host_and_ports = [(host, int(port))], **ssl_opts)
+            conn = stomp.Connection12(host_and_ports = [(host, int(port))], vhost=vhost, **ssl_opts)
             conn_dict[conn_id] = conn
     ret_list = list(conn_dict.items())
     tmp_logger.debug('got {0} connections to {1}'.format(len(ret_list), ' , '.join(conn_dict.keys())))
@@ -170,14 +170,14 @@ class MsgListener(stomp.ConnectionListener):
 # message broker proxy for receiver
 class MBProxy(object):
 
-    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
+    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBProxy')
         # name of message queue
         self.name = name
         # connection; FIXME: how to choose a connection? Round-robin?
-        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file)
+        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file, vhost)
         self.conn_id, self.conn = random.choice(conn_list)
         # destination queue to subscribe
         self.destination = destination
@@ -265,14 +265,14 @@ class MBProxy(object):
 # message broker proxy for sender, waster...
 class MBSenderProxy(object):
 
-    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
+    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBSenderProxy')
         # name of message queue
         self.name = name
         # connection; FIXME: how to choose a connection? Round-robin?
-        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file)
+        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file, vhost)
         self.conn_id, self.conn = random.choice(conn_list)
         # destination queue to subscribe
         self.destination = destination
