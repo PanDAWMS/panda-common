@@ -266,6 +266,9 @@ class MsgProcAgentBase(GenericThread):
         self.init_mb_proxy_list = list(mb_proxy_dict.values())
         self.init_mb_sender_proxy_list = list(mb_sender_proxy_dict.values())
         self.processor_attr_map = dict(processor_attr_map)
+        # set self optional attributes
+        if raw_dict.get('guard_period') is not None:
+            self.guard_period = raw_dict['guard_period']
         # tear down
         del in_q_set, out_q_set, mb_proxy_dict, mb_sender_proxy_dict, processor_attr_map
         tmp_logger.debug('done')
@@ -362,7 +365,7 @@ class MsgProcAgentBase(GenericThread):
                                                 processor_name, attr_dict['plugin'].__class__.__name__,
                                                 attr_dict['in_queue'], attr_dict['out_queue']))
             except Exception as e:
-                tmp_logger.error('falied to spawn processor thread {0} with plugin={1} , in_q={2}, out_q={3} ; {4}: {5} '.format(
+                tmp_logger.error('failed to spawn processor thread {0} with plugin={1} , in_q={2}, out_q={3} ; {4}: {5} '.format(
                                                 processor_name, attr_dict['plugin'].__class__.__name__,
                                                 attr_dict['in_queue'], attr_dict['out_queue'], e.__class__.__name__, e))
         tmp_logger.debug('done')
@@ -388,7 +391,7 @@ class MsgProcAgentBase(GenericThread):
                             time.sleep(0.125)
                         tmp_logger.info('processor thread {0} stopped'.format(processor_name))
             except Exception as e:
-                tmp_logger.error('falied to stop processor thread {0} ; {1}: {2} '.format(
+                tmp_logger.error('failed to stop processor thread {0} ; {1}: {2} '.format(
                                                 processor_name, e.__class__.__name__, e))
         tmp_logger.debug('done')
 

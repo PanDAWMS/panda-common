@@ -5,6 +5,7 @@ import random
 import collections
 import time
 import copy
+import traceback
 
 try:
     from queue import Queue, Empty
@@ -39,12 +40,6 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
     conn_dict = dict()
     for host_port in host_port_list:
         host, port = host_port.split(':')
-        # ip_list = socket.gethostbyname_ex(host)[-1]
-        # for ip in ip_list:
-        #     conn_id = '{0}:{1}'.format(ip, port)
-        #     if conn_id not in conn_dict:
-        #         conn = stomp.Connection(host_and_ports = [(ip, port)], **ssl_opts)
-        #         conn_dict[conn_id] = conn
         conn_id = host_port
         if conn_id not in conn_dict:
             conn = stomp.Connection12(host_and_ports = [(host, int(port))], vhost=vhost, **ssl_opts)
@@ -176,9 +171,14 @@ class MBProxy(object):
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBProxy')
         # name of message queue
         self.name = name
-        # connection; FIXME: how to choose a connection? Round-robin?
-        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file, vhost)
-        self.conn_id, self.conn = random.choice(conn_list)
+        # connection parameters
+        self.host_port_list = host_port_list
+        self.use_ssl = use_ssl
+        self.cert_file = cert_file
+        self.key_file = key_file
+        self.vhost = vhost
+        # get connection
+        self._get_connection()
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
@@ -204,6 +204,14 @@ class MBProxy(object):
         self.got_disconnected = False
         # whether to disconnect intentionally
         self.to_disconnect = False
+
+    def _get_connection(self):
+        """
+        get a connection, store object with self.conn and self.conn_id
+        """
+        conn_list = _get_connection_list(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        self.conn_id, self.conn = random.choice(conn_list)
+        self.logger.debug('got connection about {0}'.format(self.conn_id))
 
     def _ack(self, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
@@ -244,8 +252,10 @@ class MBProxy(object):
                 self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
                                                                         self.conn_id, self.destination))
         except Exception as e:
-            self.logger.error('falied to start connection to {0} {1} ; {2}: {3} '.format(
-                                            self.conn_id, self.destination, e.__class__.__name__, e))
+            tb_str = traceback.format_exc()
+            self.logger.error('failed to start connection to {0} {1} ; {2} \n{3}'.format(
+                                self.conn_id, self.destination, e.__class__.__name__, tb_str))
+            self.got_disconnected = True
 
     def stop(self):
         self.logger.debug('stop called')
@@ -258,8 +268,9 @@ class MBProxy(object):
         self.n_restart += 1
         self.logger.debug('the {0}th attempt to restart...'.format(self.n_restart))
         self.stop()
+        self._get_connection()
         self.go()
-        self.logger.info('the {0}th restart done'.format(self.n_restart))
+        self.logger.info('the {0}th restart ended'.format(self.n_restart))
 
 
 # message broker proxy for sender, waster...
@@ -271,9 +282,14 @@ class MBSenderProxy(object):
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBSenderProxy')
         # name of message queue
         self.name = name
-        # connection; FIXME: how to choose a connection? Round-robin?
-        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file, vhost)
-        self.conn_id, self.conn = random.choice(conn_list)
+        # connection parameters
+        self.host_port_list = host_port_list
+        self.use_ssl = use_ssl
+        self.cert_file = cert_file
+        self.key_file = key_file
+        self.vhost = vhost
+        # get connection
+        self._get_connection()
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
@@ -291,6 +307,14 @@ class MBSenderProxy(object):
         self.got_disconnected = False
         # whether to disconnect intentionally
         self.to_disconnect = False
+
+    def _get_connection(self):
+        """
+        get a connection, store object with self.conn and self.conn_id
+        """
+        conn_list = _get_connection_list(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        self.conn_id, self.conn = random.choice(conn_list)
+        self.logger.debug('got connection about {0}'.format(self.conn_id))
 
     def _on_message(self, headers, message):
         self.logger.debug('_on_message drop message: {h} "{m}"'.format(h=headers, m=message))
@@ -328,8 +352,10 @@ class MBSenderProxy(object):
                 self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
                                                                         self.conn_id, self.destination))
         except Exception as e:
-            self.logger.error('falied to start connection to {0} {1} ; {2}: {3} '.format(
-                                            self.conn_id, self.destination, e.__class__.__name__, e))
+            tb_str = traceback.format_exc()
+            self.logger.error('failed to start connection to {0} {1} ; {2} \n{3}'.format(
+                                self.conn_id, self.destination, e.__class__.__name__, tb_str))
+            self.got_disconnected = True
 
     def stop(self):
         self.logger.debug('stop called')
@@ -342,5 +368,6 @@ class MBSenderProxy(object):
         self.n_restart += 1
         self.logger.debug('the {0}th attempt to restart...'.format(self.n_restart))
         self.stop()
+        self._get_connection()
         self.go()
         self.logger.info('the {0}th restart done'.format(self.n_restart))
