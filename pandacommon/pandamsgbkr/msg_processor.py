@@ -150,9 +150,10 @@ class MsgProcAgentBase(GenericThread):
         self.init_processor_list = []
         self.processor_attr_map = dict()
         self.processor_thread_map = dict()
+        self.guard_period = 300
+        self._last_guard_timestamp = 0
         # log
         tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='__init__')
-        # set from config
         # done
         tmp_logger.info('done, pid='.format(self.get_pid()))
 
@@ -168,6 +169,7 @@ class MsgProcAgentBase(GenericThread):
                     'key_file': 'bbb.key.pem',
                     'username': 'someuser',
                     'passcode': 'xxxxyyyyzzzz',
+                    'vhost': '/somehost',
                 },
                 ...
             }
@@ -232,6 +234,7 @@ class MsgProcAgentBase(GenericThread):
                                 key_file=sconf['key_file'],
                                 username=sconf['username'],
                                 passcode=sconf['passcode'],
+                                vhost=sconf.get('vhost'),
                                 wait=True)
             mb_proxy_dict[in_queue] = mb_proxy
         # mb_sender_proxy instances
@@ -247,6 +250,7 @@ class MsgProcAgentBase(GenericThread):
                                             key_file=sconf['key_file'],
                                             username=sconf['username'],
                                             passcode=sconf['passcode'],
+                                            vhost=sconf.get('vhost'),
                                             wait=True)
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
@@ -262,6 +266,9 @@ class MsgProcAgentBase(GenericThread):
         self.init_mb_proxy_list = list(mb_proxy_dict.values())
         self.init_mb_sender_proxy_list = list(mb_sender_proxy_dict.values())
         self.processor_attr_map = dict(processor_attr_map)
+        # set self optional attributes
+        if raw_dict.get('guard_period') is not None:
+            self.guard_period = raw_dict['guard_period']
         # tear down
         del in_q_set, out_q_set, mb_proxy_dict, mb_sender_proxy_dict, processor_attr_map
         tmp_logger.debug('done')
@@ -277,6 +284,22 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info('spawned listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
+    def _guard_listeners(self, mb_proxy_list):
+        """
+        guard connection/listener threads of certain message broker proxy, reconnect when disconnected
+        """
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_guard_listeners')
+        tmp_logger.debug('start')
+        for mb_proxy in mb_proxy_list:
+            if mb_proxy.got_disconnected and not mb_proxy.to_disconnect:
+                tmp_logger.debug('found listner {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
+                mb_proxy.restart()
+                if mb_proxy.n_restart > 10:
+                    tmp_logger.warning('found listner {0} keep getting disconnected; already restarted {1} times'.format(
+                                                                                        mb_proxy.name, mb_proxy.n_restart))
+                tmp_logger.info('restarted listener {0}'.format(mb_proxy.name))
+        tmp_logger.debug('done')
+
     def _kill_listeners(self, mb_proxy_list):
         """
         kill connection/listener threads of certain message broker proxy
@@ -290,7 +313,7 @@ class MsgProcAgentBase(GenericThread):
 
     def _spawn_senders(self, mb_sender_proxy_list):
         """
-        spawn connection/listener threads of certain message broker proxy
+        spawn connection/listener threads of certain message broker sender proxy
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_spawn_senders')
         tmp_logger.debug('start')
@@ -299,9 +322,25 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info('spawned listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
+    def _guard_senders(self, mb_sender_proxy_list):
+        """
+        guard connection/listener threads of certain message broker sender proxy, reconnect when disconnected
+        """
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_guard_senders')
+        tmp_logger.debug('start')
+        for mb_proxy in mb_sender_proxy_list:
+            if mb_proxy.got_disconnected and not mb_proxy.to_disconnect:
+                tmp_logger.debug('found listner {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
+                mb_proxy.restart()
+                if mb_proxy.n_restart > 10:
+                    tmp_logger.warning('found listner {0} keep getting disconnected; already restarted {1} times'.format(
+                                                                                        mb_proxy.name, mb_proxy.n_restart))
+                tmp_logger.info('restarted listener {0}'.format(mb_proxy.name))
+        tmp_logger.debug('done')
+
     def _kill_senders(self, mb_sender_proxy_list):
         """
-        kill connection/listener threads of certain message broker proxy
+        kill connection/listener threads of certain message broker sender proxy
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_kill_senders')
         tmp_logger.debug('start')
@@ -326,7 +365,7 @@ class MsgProcAgentBase(GenericThread):
                                                 processor_name, attr_dict['plugin'].__class__.__name__,
                                                 attr_dict['in_queue'], attr_dict['out_queue']))
             except Exception as e:
-                tmp_logger.error('falied to spawn processor thread {0} with plugin={1} , in_q={2}, out_q={3} ; {4}: {5} '.format(
+                tmp_logger.error('failed to spawn processor thread {0} with plugin={1} , in_q={2}, out_q={3} ; {4}: {5} '.format(
                                                 processor_name, attr_dict['plugin'].__class__.__name__,
                                                 attr_dict['in_queue'], attr_dict['out_queue'], e.__class__.__name__, e))
         tmp_logger.debug('done')
@@ -352,7 +391,7 @@ class MsgProcAgentBase(GenericThread):
                             time.sleep(0.125)
                         tmp_logger.info('processor thread {0} stopped'.format(processor_name))
             except Exception as e:
-                tmp_logger.error('falied to stop processor thread {0} ; {1}: {2} '.format(
+                tmp_logger.error('failed to stop processor thread {0} ; {1}: {2} '.format(
                                                 processor_name, e.__class__.__name__, e))
         tmp_logger.debug('done')
 
@@ -395,7 +434,12 @@ class MsgProcAgentBase(GenericThread):
         # main loop
         tmp_logger.debug('looping')
         while self.__to_run:
-            # TODO: monitor ?!
+            # guard listeners and senders
+            if time.time() >= self._last_guard_timestamp + self.guard_period:
+                self._guard_listeners(self.init_mb_proxy_list)
+                self._guard_senders(self.init_mb_sender_proxy_list)
+                self._last_guard_timestamp = time.time()
+            # sleep
             time.sleep(1)
         # tear down
         tmp_logger.debug('tearing down')

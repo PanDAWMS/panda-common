@@ -5,6 +5,7 @@ import random
 import collections
 import time
 import copy
+import traceback
 
 try:
     from queue import Queue, Empty
@@ -27,7 +28,7 @@ _BUFFER_MAP = dict()
 
 
 # get connection list
-def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file=None, force=False):
+def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, force=False):
     """
     get list of (conn_id, connection)
     """
@@ -39,15 +40,9 @@ def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file
     conn_dict = dict()
     for host_port in host_port_list:
         host, port = host_port.split(':')
-        # ip_list = socket.gethostbyname_ex(host)[-1]
-        # for ip in ip_list:
-        #     conn_id = '{0}:{1}'.format(ip, port)
-        #     if conn_id not in conn_dict:
-        #         conn = stomp.Connection(host_and_ports = [(ip, port)], **ssl_opts)
-        #         conn_dict[conn_id] = conn
         conn_id = host_port
         if conn_id not in conn_dict:
-            conn = stomp.Connection12(host_and_ports = [(host, int(port))], **ssl_opts)
+            conn = stomp.Connection12(host_and_ports = [(host, int(port))], vhost=vhost, **ssl_opts)
             conn_dict[conn_id] = conn
     ret_list = list(conn_dict.items())
     tmp_logger.debug('got {0} connections to {1}'.format(len(ret_list), ' , '.join(conn_dict.keys())))
@@ -151,6 +146,7 @@ class MsgListener(stomp.ConnectionListener):
 
     def on_disconnected(self):
         self.logger.info('on_disconnected start')
+        self.mb_proxy._on_disconnected()
         self.logger.info('on_disconnected done')
 
     def on_send(self, frame):
@@ -169,15 +165,20 @@ class MsgListener(stomp.ConnectionListener):
 # message broker proxy for receiver
 class MBProxy(object):
 
-    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
+    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBProxy')
         # name of message queue
         self.name = name
-        # connection; FIXME: how to choose a connection? Round-robin?
-        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file)
-        self.conn_id, self.conn = random.choice(conn_list)
+        # connection parameters
+        self.host_port_list = host_port_list
+        self.use_ssl = use_ssl
+        self.cert_file = cert_file
+        self.key_file = key_file
+        self.vhost = vhost
+        # get connection
+        self._get_connection()
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
@@ -197,6 +198,20 @@ class MBProxy(object):
         self.skip_buffer = skip_buffer
         # dump messages
         self.dump_msgs = []
+        # number of attempts to restart
+        self.n_restart = 0
+        # whether got disconnected from on_disconnected
+        self.got_disconnected = False
+        # whether to disconnect intentionally
+        self.to_disconnect = False
+
+    def _get_connection(self):
+        """
+        get a connection, store object with self.conn and self.conn_id
+        """
+        conn_list = _get_connection_list(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        self.conn_id, self.conn = random.choice(conn_list)
+        self.logger.debug('got connection about {0}'.format(self.conn_id))
 
     def _ack(self, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
@@ -219,10 +234,16 @@ class MBProxy(object):
             self.msg_buffer.put(msg_obj)
             self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
 
+    def _on_disconnected(self):
+        self.logger.debug('_on_disconnected called')
+        self.got_disconnected = True
+
     def go(self):
         self.logger.debug('go called')
+        self.to_disconnect = False
         try:
             if not self.conn.is_connected():
+                self.got_disconnected = False
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 self.conn.connect(**self.connect_params)
                 self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
@@ -231,27 +252,44 @@ class MBProxy(object):
                 self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
                                                                         self.conn_id, self.destination))
         except Exception as e:
-            self.logger.error('falied to start connection to {0} {1} ; {2}: {3} '.format(
-                                            self.conn_id, self.destination, e.__class__.__name__, e))
+            tb_str = traceback.format_exc()
+            self.logger.error('failed to start connection to {0} {1} ; {2} \n{3}'.format(
+                                self.conn_id, self.destination, e.__class__.__name__, tb_str))
+            self.got_disconnected = True
 
     def stop(self):
         self.logger.debug('stop called')
+        self.to_disconnect = True
         self.conn.disconnect()
         self.logger.info('disconnect from {0} {1}'.format(self.conn_id, self.destination))
+
+    def restart(self):
+        self.logger.debug('restart called')
+        self.n_restart += 1
+        self.logger.debug('the {0}th attempt to restart...'.format(self.n_restart))
+        self.stop()
+        self._get_connection()
+        self.go()
+        self.logger.info('the {0}th restart ended'.format(self.n_restart))
 
 
 # message broker proxy for sender, waster...
 class MBSenderProxy(object):
 
-    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None,
+    def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBSenderProxy')
         # name of message queue
         self.name = name
-        # connection; FIXME: how to choose a connection? Round-robin?
-        conn_list = _get_connection_list(host_port_list, use_ssl, cert_file, key_file)
-        self.conn_id, self.conn = random.choice(conn_list)
+        # connection parameters
+        self.host_port_list = host_port_list
+        self.use_ssl = use_ssl
+        self.cert_file = cert_file
+        self.key_file = key_file
+        self.vhost = vhost
+        # get connection
+        self._get_connection()
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
@@ -263,9 +301,27 @@ class MBSenderProxy(object):
                                 'headers': {'client-id': self.client_id}}
         # message listener
         self.listener = MsgListener(mb_proxy=self)
+        # number of attempts to restart
+        self.n_restart = 0
+        # whether got disconnected from on_disconnected
+        self.got_disconnected = False
+        # whether to disconnect intentionally
+        self.to_disconnect = False
+
+    def _get_connection(self):
+        """
+        get a connection, store object with self.conn and self.conn_id
+        """
+        conn_list = _get_connection_list(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        self.conn_id, self.conn = random.choice(conn_list)
+        self.logger.debug('got connection about {0}'.format(self.conn_id))
 
     def _on_message(self, headers, message):
         self.logger.debug('_on_message drop message: {h} "{m}"'.format(h=headers, m=message))
+
+    def _on_disconnected(self):
+        self.logger.debug('_on_disconnected called')
+        self.got_disconnected = True
 
     def send(self, data):
         """
@@ -285,8 +341,10 @@ class MBSenderProxy(object):
 
     def go(self):
         self.logger.debug('go called')
+        self.to_disconnect = False
         try:
             if not self.conn.is_connected():
+                self.got_disconnected = False
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 self.conn.connect(**self.connect_params)
                 self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
@@ -294,10 +352,22 @@ class MBSenderProxy(object):
                 self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
                                                                         self.conn_id, self.destination))
         except Exception as e:
-            self.logger.error('falied to start connection to {0} {1} ; {2}: {3} '.format(
-                                            self.conn_id, self.destination, e.__class__.__name__, e))
+            tb_str = traceback.format_exc()
+            self.logger.error('failed to start connection to {0} {1} ; {2} \n{3}'.format(
+                                self.conn_id, self.destination, e.__class__.__name__, tb_str))
+            self.got_disconnected = True
 
     def stop(self):
         self.logger.debug('stop called')
+        self.to_disconnect = True
         self.conn.disconnect()
         self.logger.info('disconnect from {0} {1}'.format(self.conn_id, self.destination))
+
+    def restart(self):
+        self.logger.debug('restart called')
+        self.n_restart += 1
+        self.logger.debug('the {0}th attempt to restart...'.format(self.n_restart))
+        self.stop()
+        self._get_connection()
+        self.go()
+        self.logger.info('the {0}th restart done'.format(self.n_restart))
