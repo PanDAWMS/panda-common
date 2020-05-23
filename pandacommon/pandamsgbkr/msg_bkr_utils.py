@@ -27,26 +27,35 @@ _GLOBAL_LOCK = threading.Lock()
 _BUFFER_MAP = dict()
 
 
-# get connection list
-def _get_connection_list(host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, force=False):
+# get connection dict
+def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, force=False):
     """
-    get list of (conn_id, connection)
+    get dict {conn_id: connection}
     """
-    tmp_logger = logger_utils.make_logger(base_logger, method_name='_get_connection_list')
+    tmp_logger = logger_utils.make_logger(base_logger, method_name='_get_connection_dict')
     ssl_opts = {'use_ssl' : use_ssl,
                 'ssl_version' : ssl.PROTOCOL_TLSv1,
                 'ssl_cert_file' : cert_file,
                 'ssl_key_file'  : key_file}
     conn_dict = dict()
+    # resolve all distinct hosts behind hostname
+    resolved_host_port_set = set()
     for host_port in host_port_list:
         host, port = host_port.split(':')
+        port = int(port)
+        addrinfos = socket.getaddrinfo(host, port)
+        for addrinfo in addrinfos:
+            resolved_host = socket.getfqdn(addrinfo[4][0])
+            resolved_host_port_set.add((resolved_host, port))
+    # make connections
+    for host, port in resolved_host_port_set:
+        host_port = '{0}:{1}'.format(host, port)
         conn_id = host_port
         if conn_id not in conn_dict:
-            conn = stomp.Connection12(host_and_ports = [(host, int(port))], vhost=vhost, **ssl_opts)
+            conn = stomp.Connection12(host_and_ports = [(host, port)], vhost=vhost, **ssl_opts)
             conn_dict[conn_id] = conn
-    ret_list = list(conn_dict.items())
-    tmp_logger.debug('got {0} connections to {1}'.format(len(ret_list), ' , '.join(conn_dict.keys())))
-    return ret_list
+    tmp_logger.debug('got {0} connections to {1}'.format(len(conn_dict), ' , '.join(conn_dict.keys())))
+    return conn_dict
 
 
 # message buffer
@@ -99,11 +108,13 @@ class MsgObj(object):
     Support with-statement
     """
 
-    __slots__ = ('__mb_proxy', 'sub_id', 'msg_id', 'ack_id', 'data')
+    __slots__ = ('__mb_proxy', 'conn_id', 'sub_id', 'msg_id', 'ack_id', 'data')
 
-    def __init__(self, mb_proxy, msg_id, ack_id, data):
+    def __init__(self, mb_proxy, conn_id, msg_id, ack_id, data):
         # associated proxy object
         self.__mb_proxy = mb_proxy
+        # connection ID
+        self.conn_id = conn_id
         # subscription ID
         self.sub_id = self.__mb_proxy.sub_id
         # message ID
@@ -121,10 +132,10 @@ class MsgObj(object):
         self.__mb_proxy.logger.debug('msg_id={m} MsgObj.__exit__ called'.format(m=self.msg_id))
         if exc_type or exc_value:
             # exception occurs, send nack
-            self.__mb_proxy._nack(self.msg_id, self.ack_id)
+            self.__mb_proxy._nack(self.conn_id, self.msg_id, self.ack_id)
         else:
             # done, send ack
-            self.__mb_proxy._ack(self.msg_id, self.ack_id)
+            self.__mb_proxy._ack(self.conn_id, self.msg_id, self.ack_id)
 
 
 # message listener
@@ -133,12 +144,14 @@ class MsgListener(stomp.ConnectionListener):
     Message listener of STOMP
     """
 
-    def __init__(self, mb_proxy, *args, **kwargs):
+    def __init__(self, mb_proxy, conn_id, *args, **kwargs):
         # logger
         _token = '{0}-{1}'.format(mb_proxy.__class__.__name__, mb_proxy.name)
         self.logger = logger_utils.make_logger(base_logger, token=_token, method_name='MsgListener')
         # associated messgage broker proxy
         self.mb_proxy = mb_proxy
+        # connection id
+        self.conn_id = conn_id
 
     def on_error(self, headers, message):
         self.logger.error('on_error start: {h} "{m}"'.format(h=headers, m=message))
@@ -146,7 +159,7 @@ class MsgListener(stomp.ConnectionListener):
 
     def on_disconnected(self):
         self.logger.info('on_disconnected start')
-        self.mb_proxy._on_disconnected()
+        self.mb_proxy._on_disconnected(conn_id=self.conn_id)
         self.logger.info('on_disconnected done')
 
     def on_send(self, frame):
@@ -158,7 +171,7 @@ class MsgListener(stomp.ConnectionListener):
 
     def on_message(self, headers, message):
         self.logger.debug('on_message start: {h} "{m}"'.format(h=headers, m=message))
-        self.mb_proxy._on_message(headers, message)
+        self.mb_proxy._on_message(headers, message, conn_id=self.conn_id)
         self.logger.debug('on_message done: {h}'.format(h=headers))
 
 
@@ -166,7 +179,7 @@ class MsgListener(stomp.ConnectionListener):
 class MBProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
-                    username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False):
+                    username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False, conn_mode='all'):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBProxy')
         # name of message queue
@@ -177,8 +190,6 @@ class MBProxy(object):
         self.cert_file = cert_file
         self.key_file = key_file
         self.vhost = vhost
-        # get connection
-        self._get_connection()
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
@@ -192,8 +203,12 @@ class MBProxy(object):
         self.ack_mode = ack_mode
         # associate message buffer
         self.msg_buffer = MsgBuffer(queue_name=self.name)
-        # message listener
-        self.listener = MsgListener(mb_proxy=self)
+        # connection mode; "all" or "any"
+        self.conn_mode = conn_mode
+        # connection dict
+        self.connection_dict = {}
+        # message listener dict
+        self.listener_dict = {}
         # whether to skip buffer and dump to self.dump_msgs; True only in testing
         self.skip_buffer = skip_buffer
         # dump messages
@@ -204,71 +219,92 @@ class MBProxy(object):
         self.got_disconnected = False
         # whether to disconnect intentionally
         self.to_disconnect = False
+        # get connections
+        self._get_connections()
 
-    def _get_connection(self):
+    def _get_connections(self):
         """
-        get a connection, store object with self.conn and self.conn_id
+        get connections and generate listener objects
         """
-        conn_list = _get_connection_list(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
-        self.conn_id, self.conn = random.choice(conn_list)
-        self.logger.debug('got connection about {0}'.format(self.conn_id))
+        self.connection_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        self.logger.debug('start, conn_mode={0}'.format(self.conn_mode))
+        if self.conn_mode == 'all':
+            # for receiver, subscribe all hosts behind the same hostname
+            for conn_id, conn in self.connection_dict.items():
+                listener = MsgListener(mb_proxy=self, conn_id=conn_id)
+                self.listener_dict[conn_id] = listener
+                self.logger.debug('got connection about {0}'.format(conn_id))
+        elif self.conn_mode == 'any':
+            # for receiver, subscribe any single host behind the same hostname
+            conn_id, conn = random.choice([self.connection_dict.items()])
+            listener = MsgListener(mb_proxy=self, conn_id=conn_id)
+            self.listener_dict[conn_id] = listener
+            self.logger.debug('got connection about {0}'.format(conn_id))
+        self.logger.debug('done')
 
-    def _ack(self, msg_id, ack_id):
+    def _ack(self, conn_id, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
-            self.conn.ack(ack_id)
-            self.logger.debug('{mid} {ackid} ACKed'.format(mid=msg_id, ackid=ack_id))
+            conn = self.connection_dict[conn_id]
+            conn.ack(ack_id)
+            self.logger.debug('{conid} {mid} {ackid} ACKed'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
-    def _nack(self, msg_id, ack_id):
+    def _nack(self, conn_id, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
-            self.conn.nack(ack_id)
-            self.logger.debug('{mid} {ackid} NACKed'.format(mid=msg_id, ackid=ack_id))
+            conn = self.connection_dict[conn_id]
+            conn.nack(ack_id)
+            self.logger.debug('{conid} {mid} {ackid} NACKed'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
-    def _on_message(self, headers, message):
-        msg_obj = MsgObj(mb_proxy=self, msg_id=headers['message-id'], ack_id=headers['ack'], data=message)
-        self.logger.debug('_on_message made message object: {h}'.format(h=headers))
+    def _on_message(self, headers, message, conn_id):
+        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=message)
+        self.logger.debug('_on_message from {c} made message object: {h}'.format(c=conn_id, h=headers))
         if self.skip_buffer:
             self.logger.debug('_on_message (buffer_skipped) dump the message: {h}'.format(h=headers))
             self.dump_msgs.append(msg_obj.data)
-            self._ack(msg_obj.msg_id, msg_obj.ack_id)
+            self._ack(msg_obj.conn_id, msg_obj.msg_id, msg_obj.ack_id)
         else:
             self.msg_buffer.put(msg_obj)
             self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
 
-    def _on_disconnected(self):
-        self.logger.debug('_on_disconnected called')
+    def _on_disconnected(self, conn_id):
+        self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
         self.got_disconnected = True
 
     def go(self):
         self.logger.debug('go called')
         self.to_disconnect = False
-        try:
-            if not self.conn.is_connected():
-                self.got_disconnected = False
-                self.conn.set_listener(self.listener.__class__.__name__, self.listener)
-                self.conn.connect(**self.connect_params)
-                self.conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
-                self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
-            else:
-                self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
-                                                                        self.conn_id, self.destination))
-        except Exception as e:
-            tb_str = traceback.format_exc()
-            self.logger.error('failed to start connection to {0} {1} ; {2} \n{3}'.format(
-                                self.conn_id, self.destination, e.__class__.__name__, tb_str))
-            self.got_disconnected = True
+        for conn_id, conn in self.connection_dict.items():
+            try:
+                if not conn.is_connected():
+                    listener = self.listener_dict[conn_id]
+                    self.got_disconnected = False
+                    conn.set_listener(listener.__class__.__name__, listener)
+                    conn.connect(**self.connect_params)
+                    conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
+                    self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
+                else:
+                    self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
+                                                                        conn_id, self.destination))
+            except Exception as e:
+                tb_str = traceback.format_exc()
+                self.logger.error('failed to start connection to {0} {1} ; {2} \n{3}'.format(
+                                    conn_id, self.destination, e.__class__.__name__, tb_str))
+                self.got_disconnected = True
+                break
 
     def stop(self):
         self.logger.debug('stop called')
         self.to_disconnect = True
-        self.conn.disconnect()
-        self.logger.info('disconnect from {0} {1}'.format(self.conn_id, self.destination))
+        for conn_id, conn in self.connection_dict.items():
+            conn.disconnect()
+            self.logger.info('disconnect from {0} {1}'.format(conn_id, self.destination))
+        self.logger.info('done')
 
     def restart(self):
         self.logger.debug('restart called')
         self.n_restart += 1
         self.logger.debug('the {0}th attempt to restart...'.format(self.n_restart))
         self.stop()
-        self._get_connection()
+        self._get_connections()
         self.go()
         self.logger.info('the {0}th restart ended'.format(self.n_restart))
 
@@ -288,8 +324,6 @@ class MBSenderProxy(object):
         self.cert_file = cert_file
         self.key_file = key_file
         self.vhost = vhost
-        # get connection
-        self._get_connection()
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
@@ -299,21 +333,22 @@ class MBSenderProxy(object):
         # connect parameters
         self.connect_params = {'username': username, 'passcode': passcode, 'wait': wait,
                                 'headers': {'client-id': self.client_id}}
-        # message listener
-        self.listener = MsgListener(mb_proxy=self)
         # number of attempts to restart
         self.n_restart = 0
         # whether got disconnected from on_disconnected
         self.got_disconnected = False
         # whether to disconnect intentionally
         self.to_disconnect = False
+        # get connection
+        self._get_connection()
 
     def _get_connection(self):
         """
-        get a connection, store object with self.conn and self.conn_id
+        get a connection and a listener
         """
-        conn_list = _get_connection_list(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
-        self.conn_id, self.conn = random.choice(conn_list)
+        conn_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        self.conn_id, self.conn = random.choice([conn_dict.items()])
+        self.listener = MsgListener(mb_proxy=self, conn_id=self.conn)
         self.logger.debug('got connection about {0}'.format(self.conn_id))
 
     def _on_message(self, headers, message):
