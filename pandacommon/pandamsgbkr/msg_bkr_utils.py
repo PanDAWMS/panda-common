@@ -108,9 +108,9 @@ class MsgObj(object):
     Support with-statement
     """
 
-    __slots__ = ('__mb_proxy', 'conn_id', 'sub_id', 'msg_id', 'ack_id', 'data')
+    __slots__ = ('__mb_proxy', 'conn_id', 'sub_id', 'msg_id', 'ack_id', 'data', 'is_transacted', 'txs_id')
 
-    def __init__(self, mb_proxy, conn_id, msg_id, ack_id, data):
+    def __init__(self, mb_proxy, conn_id, msg_id, ack_id, data, is_transacted=True):
         # associated proxy object
         self.__mb_proxy = mb_proxy
         # connection ID
@@ -119,23 +119,37 @@ class MsgObj(object):
         self.sub_id = self.__mb_proxy.sub_id
         # message ID
         self.msg_id = msg_id
-        # ack ID
+        # acknowledgement ID
         self.ack_id = ack_id
         # real message data
         self.data = data
+        # whether use transaction
+        self.is_transacted = is_transacted
 
     def __enter__(self):
         self.__mb_proxy.logger.debug('msg_id={m} MsgObj.__enter__ called'.format(m=self.msg_id))
+        if self.is_transacted:
+            # transcation ID
+            self.txs_id = self.__mb_proxy._begin(self.conn_id)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.__mb_proxy.logger.debug('msg_id={m} MsgObj.__exit__ called'.format(m=self.msg_id))
-        if exc_type or exc_value:
-            # exception occurs, send nack
-            self.__mb_proxy._nack(self.conn_id, self.msg_id, self.ack_id)
+        if self.is_transacted:
+            if exc_type or exc_value:
+                # exception occurs, send abort
+                self.__mb_proxy._abort(self.conn_id, self.txs_id)
+            else:
+                # done, send ack and commit
+                self.__mb_proxy._ack(self.conn_id, self.msg_id, self.ack_id)
+                self.__mb_proxy._commit(self.conn_id, self.txs_id)
         else:
-            # done, send ack
-            self.__mb_proxy._ack(self.conn_id, self.msg_id, self.ack_id)
+            if exc_type or exc_value:
+                # exception occurs, send nack
+                self.__mb_proxy._nack(self.conn_id, self.msg_id, self.ack_id)
+            else:
+                # done, send ack
+                self.__mb_proxy._ack(self.conn_id, self.msg_id, self.ack_id)
 
 
 # message listener
@@ -199,7 +213,7 @@ class MBProxy(object):
         # connect parameters
         self.connect_params = {'username': username, 'passcode': passcode, 'wait': wait,
                                 'headers': {'client-id': self.client_id}}
-        # acknoledge mode
+        # acknowledge mode
         self.ack_mode = ack_mode
         # associate message buffer
         self.msg_buffer = MsgBuffer(queue_name=self.name)
@@ -242,17 +256,33 @@ class MBProxy(object):
             self.logger.debug('got connection about {0}'.format(conn_id))
         self.logger.debug('done')
 
+    def _begin(self, conn_id):
+        conn = self.connection_dict[conn_id]
+        txs_id = conn.begin()
+        self.logger.debug('{conid} txid={txid} BEGIN'.format(conid=conn_id, txid=txs_id))
+        return txs_id
+
+    def _commit(self, conn_id, txs_id):
+        conn = self.connection_dict[conn_id]
+        conn.commit(txs_id)
+        self.logger.debug('{conid} txid={txid} COMMIT'.format(conid=conn_id, txid=txs_id))
+
+    def _abort(self, conn_id, txs_id):
+        conn = self.connection_dict[conn_id]
+        conn.abort(txs_id)
+        self.logger.debug('{conid} txid={txid} ABORT'.format(conid=conn_id, txid=txs_id))
+
     def _ack(self, conn_id, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
             conn = self.connection_dict[conn_id]
             conn.ack(ack_id)
-            self.logger.debug('{conid} {mid} {ackid} ACKed'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
+            self.logger.debug('{conid} {mid} {ackid} ACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
     def _nack(self, conn_id, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:
             conn = self.connection_dict[conn_id]
             conn.nack(ack_id)
-            self.logger.debug('{conid} {mid} {ackid} NACKed'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
+            self.logger.debug('{conid} {mid} {ackid} NACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
     def _on_message(self, headers, message, conn_id):
         msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=message)
