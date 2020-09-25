@@ -68,6 +68,8 @@ class SimpleMsgProcThread(GenericThread):
         self.sleep_time = sleep_time
 
     def run(self):
+        # update logger thread id
+        self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='SimpleMsgProcThread')
         # start
         self.logger.debug('start run')
         # initialization step of plugin
@@ -153,9 +155,9 @@ class MsgProcAgentBase(GenericThread):
         self.guard_period = 300
         self._last_guard_timestamp = 0
         # log
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='__init__')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='__init__')
         # done
-        tmp_logger.info('done, pid='.format(self.get_pid()))
+        tmp_logger.info('done')
 
     def _set_from_config(self):
         """
@@ -191,7 +193,7 @@ class MsgProcAgentBase(GenericThread):
             }
         """
         # logger
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_set_from_config')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_set_from_config')
         tmp_logger.debug('start')
         # parse config json
         with open(self.config_file, 'r') as _f:
@@ -277,7 +279,7 @@ class MsgProcAgentBase(GenericThread):
         """
         spawn connection/listener threads of certain message broker proxy
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_spawn_listeners')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_spawn_listeners')
         tmp_logger.debug('start')
         for mb_proxy in mb_proxy_list:
             mb_proxy.go()
@@ -288,7 +290,7 @@ class MsgProcAgentBase(GenericThread):
         """
         guard connection/listener threads of certain message broker proxy, reconnect when disconnected
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_guard_listeners')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_guard_listeners')
         tmp_logger.debug('start')
         for mb_proxy in mb_proxy_list:
             if mb_proxy.got_disconnected and not mb_proxy.to_disconnect:
@@ -304,7 +306,7 @@ class MsgProcAgentBase(GenericThread):
         """
         kill connection/listener threads of certain message broker proxy
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_kill_listeners')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_kill_listeners')
         tmp_logger.debug('start')
         for mb_proxy in mb_proxy_list:
             mb_proxy.stop()
@@ -315,7 +317,7 @@ class MsgProcAgentBase(GenericThread):
         """
         spawn connection/listener threads of certain message broker sender proxy
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_spawn_senders')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_spawn_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             mb_proxy.go()
@@ -326,7 +328,7 @@ class MsgProcAgentBase(GenericThread):
         """
         guard connection/listener threads of certain message broker sender proxy, reconnect when disconnected
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_guard_senders')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_guard_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             if mb_proxy.got_disconnected and not mb_proxy.to_disconnect:
@@ -342,7 +344,7 @@ class MsgProcAgentBase(GenericThread):
         """
         kill connection/listener threads of certain message broker sender proxy
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_kill_senders')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_kill_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             mb_proxy.stop()
@@ -353,7 +355,7 @@ class MsgProcAgentBase(GenericThread):
         """
         spawn processors threads
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_spawn_processors')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_spawn_processors')
         tmp_logger.debug('start')
         for processor_name in processor_list:
             try:
@@ -374,7 +376,7 @@ class MsgProcAgentBase(GenericThread):
         """
         kill processor threads
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='_kill_processors')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_kill_processors')
         tmp_logger.debug('start')
         for processor_name in processor_list:
             try:
@@ -400,7 +402,7 @@ class MsgProcAgentBase(GenericThread):
         customized initialize method
         this method can override attributes set from config file
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='initialize')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='initialize')
         tmp_logger.debug('start')
         pass
         tmp_logger.debug('done')
@@ -409,7 +411,7 @@ class MsgProcAgentBase(GenericThread):
         """
         send stop signal to this thread
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='initialize')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='initialize')
         tmp_logger.debug('start')
         self.__to_run = False
         tmp_logger.info('signaled stop to self')
@@ -419,7 +421,7 @@ class MsgProcAgentBase(GenericThread):
         """
         main thread
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.__class__.__name__, method_name='run')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='run')
         tmp_logger.debug('start')
         # set attributes from config
         self._set_from_config()
