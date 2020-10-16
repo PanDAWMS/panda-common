@@ -58,7 +58,7 @@ class SimpleMsgProcThread(GenericThread):
     Thread of simple message processor of certain plugin
     """
 
-    def __init__(self, attr_dict, sleep_time=0.03125):
+    def __init__(self, attr_dict, sleep_time):
         GenericThread.__init__(self)
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='SimpleMsgProcThread')
         self.__to_run = True
@@ -71,15 +71,15 @@ class SimpleMsgProcThread(GenericThread):
         # update logger thread id
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='SimpleMsgProcThread')
         # start
-        self.logger.debug('start run')
+        self.logger.info('start run')
         # initialization step of plugin
-        self.logger.debug('plugin initialize')
+        self.logger.info('plugin initialize')
         self.plugin.initialize()
         # message buffer
-        self.logger.debug('message buffer is {0}'.format(self.in_queue))
+        self.logger.info('message buffer is {0}'.format(self.in_queue))
         msg_buffer = MsgBuffer(queue_name=self.in_queue)
         # main loop
-        self.logger.debug('start loop')
+        self.logger.info('start loop')
         while self.__to_run:
             is_processed = False
             proc_ret = None
@@ -116,9 +116,9 @@ class SimpleMsgProcThread(GenericThread):
             # sleep
             time.sleep(self.sleep_time)
         # stop loop
-        self.logger.debug('stopped loop')
+        self.logger.info('stopped loop')
         # tear down
-        self.logger.debug('stopped run')
+        self.logger.info('stopped run')
 
     def stop(self):
         """
@@ -143,10 +143,11 @@ class MsgProcAgentBase(GenericThread):
     Base class of message processing agent (main thread)
     """
 
-    def __init__(self, config_file, **kwargs):
+    def __init__(self, config_file, process_sleep_time=0.03125, **kwargs):
         GenericThread.__init__(self)
         self.__to_run = True
         self.config_file = config_file
+        self.process_sleep_time = process_sleep_time
         self.init_mb_proxy_list = []
         self.init_mb_sender_proxy_list = []
         self.init_processor_list = []
@@ -360,7 +361,7 @@ class MsgProcAgentBase(GenericThread):
         for processor_name in processor_list:
             try:
                 attr_dict = self.processor_attr_map[processor_name]
-                self.processor_thread_map[processor_name] = SimpleMsgProcThread(attr_dict)
+                self.processor_thread_map[processor_name] = SimpleMsgProcThread(attr_dict, sleep_time=self.process_sleep_time)
                 mc_thread = self.processor_thread_map[processor_name]
                 mc_thread.start()
                 tmp_logger.info('spawned processors thread {0} with plugin={1} , in_q={2}, out_q={3}'.format(
