@@ -143,7 +143,7 @@ class MsgProcAgentBase(GenericThread):
     Base class of message processing agent (main thread)
     """
 
-    def __init__(self, config_file, process_sleep_time=0.03125, **kwargs):
+    def __init__(self, config_file, process_sleep_time=0.0001, **kwargs):
         GenericThread.__init__(self)
         self.__to_run = True
         self.config_file = config_file
