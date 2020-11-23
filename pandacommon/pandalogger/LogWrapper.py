@@ -31,7 +31,7 @@ class LogWrapper:
 
     # get memory usage
     def getMemoryUsage(self):
-        return ' (mem usage {0} MB)'.format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
+        return ' (mem usage {0} MB)'.format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024)
 
 
     def keepMsg(self,msg):
