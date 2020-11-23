@@ -408,14 +408,17 @@ class MsgProcAgentBase(GenericThread):
         pass
         tmp_logger.debug('done')
 
-    def stop(self):
+    def stop(self, block=True):
         """
         send stop signal to this thread
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='stop')
         tmp_logger.debug('start')
         self.__to_run = False
-        tmp_logger.info('signaled stop to self')
+        tmp_logger.info('signaled stop')
+        if block:
+            while self.is_alive():
+                time.sleep(0.01)
         tmp_logger.debug('done')
 
     def run(self):
@@ -443,7 +446,7 @@ class MsgProcAgentBase(GenericThread):
                 self._guard_senders(self.init_mb_sender_proxy_list)
                 self._last_guard_timestamp = time.time()
             # sleep
-            time.sleep(1)
+            time.sleep(0.01)
         # tear down
         tmp_logger.debug('tearing down')
         # kill all message broker proxy threads
