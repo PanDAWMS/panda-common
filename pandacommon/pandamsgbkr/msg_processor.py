@@ -412,7 +412,7 @@ class MsgProcAgentBase(GenericThread):
         """
         send stop signal to this thread
         """
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='initialize')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='stop')
         tmp_logger.debug('start')
         self.__to_run = False
         tmp_logger.info('signaled stop to self')
