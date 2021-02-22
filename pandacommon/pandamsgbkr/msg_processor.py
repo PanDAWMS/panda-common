@@ -173,6 +173,7 @@ class MsgProcAgentBase(GenericThread):
                     'username': 'someuser',
                     'passcode': 'xxxxyyyyzzzz',
                     'vhost': '/somehost',
+                    'verbose': True,
                 },
                 ...
             }
@@ -185,6 +186,7 @@ class MsgProcAgentBase(GenericThread):
             }
         processors_dict = {
                 'Processor_1': {
+                    'enable': True,
                     'module': 'plugin.module',
                     'name': 'PluginClassName',
                     'in_queue': 'Queue_1',
@@ -208,6 +210,9 @@ class MsgProcAgentBase(GenericThread):
         in_q_set = set()
         out_q_set = set()
         for proc, pconf in processors_dict.items():
+            # skip if not enabled
+            if not pconf.get('enable', True):
+                continue
             # queues
             in_queue = pconf.get('in_queue')
             out_queue = pconf.get('out_queue')
@@ -261,7 +266,7 @@ class MsgProcAgentBase(GenericThread):
                                             )
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
-        for proc in processors_dict.keys():
+        for proc in processor_attr_map.keys():
             in_queue = processor_attr_map[proc]['in_queue']
             if in_queue:
                 processor_attr_map[proc]['mb_proxy'] = mb_proxy_dict[in_queue]
@@ -269,7 +274,7 @@ class MsgProcAgentBase(GenericThread):
             if out_queue:
                 processor_attr_map[proc]['mb_sender_proxy'] = mb_sender_proxy_dict[out_queue]
         # set self attributes
-        self.init_processor_list = list(processors_dict.keys())
+        self.init_processor_list = list(processor_attr_map.keys())
         self.init_mb_proxy_list = list(mb_proxy_dict.values())
         self.init_mb_sender_proxy_list = list(mb_sender_proxy_dict.values())
         self.processor_attr_map = dict(processor_attr_map)
