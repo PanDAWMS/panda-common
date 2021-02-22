@@ -286,7 +286,8 @@ class MBProxy(object):
         if self.ack_mode in ['client', 'client-individual']:
             conn = self.connection_dict[conn_id]
             conn.ack(ack_id)
-            self.logger.debug('{conid} {mid} {ackid} ACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
+            if self.verbose:
+                self.logger.debug('{conid} {mid} {ackid} ACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
     def _nack(self, conn_id, msg_id, ack_id):
         if self.ack_mode in ['client', 'client-individual']:

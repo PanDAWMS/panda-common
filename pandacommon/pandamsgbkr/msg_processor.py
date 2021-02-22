@@ -66,6 +66,7 @@ class SimpleMsgProcThread(GenericThread):
         self.in_queue = attr_dict.get('in_queue')
         self.mb_sender_proxy = attr_dict.get('mb_sender_proxy')
         self.sleep_time = sleep_time
+        self.verbose = attr_dict.get('verbose', False)
 
     def run(self):
         # update logger thread id
@@ -88,31 +89,38 @@ class SimpleMsgProcThread(GenericThread):
                 # get from buffer
                 msg_obj = msg_buffer.get()
                 if msg_obj is not None:
-                    self.logger.debug('received a new message')
-                    self.logger.debug('plugin process start')
+                    if self.verbose:
+                        self.logger.debug('received a new message')
+                        self.logger.debug('plugin process start')
                     try:
                         with msg_obj as _msg_obj:
                             proc_ret = self.plugin.process(_msg_obj)
                         is_processed = True
-                        self.logger.debug('successfully processed')
+                        if self.verbose:
+                            self.logger.debug('successfully processed')
                     except Exception as e:
                         self.logger.error('error when process message msg_id={0} with {1}: {2} '.format(
                                                                 msg_obj.msg_id , e.__class__.__name__, e))
-                    self.logger.debug('plugin process end')
+                    if self.verbose:
+                        self.logger.debug('plugin process end')
             else:
-                self.logger.debug('plugin process start')
+                if self.verbose:
+                    self.logger.debug('plugin process start')
                 try:
                     proc_ret = self.plugin.process(None)
                     is_processed = True
-                    self.logger.debug('successfully processed')
+                    if self.verbose:
+                        self.logger.debug('successfully processed')
                 except Exception as e:
                     self.logger.error('error when process with {0}: {1} '.format(
                                                             msg_obj.msg_id , e.__class__.__name__, e))
-                self.logger.debug('plugin process end')
+                if self.verbose:
+                    self.logger.debug('plugin process end')
             # as producer
             if self.mb_sender_proxy and is_processed:
                 self.mb_sender_proxy.send(proc_ret)
-                self.logger.debug('sent a processed message')
+                if self.verbose:
+                    self.logger.debug('sent a processed message')
             # sleep
             time.sleep(self.sleep_time)
         # stop loop
@@ -191,6 +199,7 @@ class MsgProcAgentBase(GenericThread):
                     'name': 'PluginClassName',
                     'in_queue': 'Queue_1',
                     'out_queue': 'Queue_2',
+                    'verbose': True,
                 },
                 ...
             }
