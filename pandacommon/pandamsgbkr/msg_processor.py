@@ -238,7 +238,9 @@ class MsgProcAgentBase(GenericThread):
                                 username=sconf.get('username'),
                                 passcode=sconf.get('passcode'),
                                 vhost=sconf.get('vhost'),
-                                wait=True)
+                                wait=True,
+                                verbose=sconf.get('verbose', False),
+                                )
             mb_proxy_dict[in_queue] = mb_proxy
         # mb_sender_proxy instances
         mb_sender_proxy_dict = dict()
@@ -254,7 +256,9 @@ class MsgProcAgentBase(GenericThread):
                                             username=sconf.get('username'),
                                             passcode=sconf.get('passcode'),
                                             vhost=sconf.get('vhost'),
-                                            wait=True)
+                                            wait=True,
+                                            verbose=sconf.get('verbose', False),
+                                            )
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
         for proc in processors_dict.keys():
