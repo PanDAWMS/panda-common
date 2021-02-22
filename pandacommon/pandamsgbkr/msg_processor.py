@@ -66,6 +66,7 @@ class SimpleMsgProcThread(GenericThread):
         self.in_queue = attr_dict.get('in_queue')
         self.mb_sender_proxy = attr_dict.get('mb_sender_proxy')
         self.sleep_time = sleep_time
+        self.verbose = attr_dict.get('verbose', False)
 
     def run(self):
         # update logger thread id
@@ -88,31 +89,38 @@ class SimpleMsgProcThread(GenericThread):
                 # get from buffer
                 msg_obj = msg_buffer.get()
                 if msg_obj is not None:
-                    self.logger.debug('received a new message')
-                    self.logger.debug('plugin process start')
+                    if self.verbose:
+                        self.logger.debug('received a new message')
+                        self.logger.debug('plugin process start')
                     try:
                         with msg_obj as _msg_obj:
                             proc_ret = self.plugin.process(_msg_obj)
                         is_processed = True
-                        self.logger.debug('successfully processed')
+                        if self.verbose:
+                            self.logger.debug('successfully processed')
                     except Exception as e:
                         self.logger.error('error when process message msg_id={0} with {1}: {2} '.format(
                                                                 msg_obj.msg_id , e.__class__.__name__, e))
-                    self.logger.debug('plugin process end')
+                    if self.verbose:
+                        self.logger.debug('plugin process end')
             else:
-                self.logger.debug('plugin process start')
+                if self.verbose:
+                    self.logger.debug('plugin process start')
                 try:
                     proc_ret = self.plugin.process(None)
                     is_processed = True
-                    self.logger.debug('successfully processed')
+                    if self.verbose:
+                        self.logger.debug('successfully processed')
                 except Exception as e:
                     self.logger.error('error when process with {0}: {1} '.format(
                                                             msg_obj.msg_id , e.__class__.__name__, e))
-                self.logger.debug('plugin process end')
+                if self.verbose:
+                    self.logger.debug('plugin process end')
             # as producer
             if self.mb_sender_proxy and is_processed:
                 self.mb_sender_proxy.send(proc_ret)
-                self.logger.debug('sent a processed message')
+                if self.verbose:
+                    self.logger.debug('sent a processed message')
             # sleep
             time.sleep(self.sleep_time)
         # stop loop
@@ -173,6 +181,7 @@ class MsgProcAgentBase(GenericThread):
                     'username': 'someuser',
                     'passcode': 'xxxxyyyyzzzz',
                     'vhost': '/somehost',
+                    'verbose': True,
                 },
                 ...
             }
@@ -185,10 +194,12 @@ class MsgProcAgentBase(GenericThread):
             }
         processors_dict = {
                 'Processor_1': {
+                    'enable': True,
                     'module': 'plugin.module',
                     'name': 'PluginClassName',
                     'in_queue': 'Queue_1',
                     'out_queue': 'Queue_2',
+                    'verbose': True,
                 },
                 ...
             }
@@ -208,6 +219,9 @@ class MsgProcAgentBase(GenericThread):
         in_q_set = set()
         out_q_set = set()
         for proc, pconf in processors_dict.items():
+            # skip if not enabled
+            if not pconf.get('enable', True):
+                continue
             # queues
             in_queue = pconf.get('in_queue')
             out_queue = pconf.get('out_queue')
@@ -232,13 +246,15 @@ class MsgProcAgentBase(GenericThread):
             mb_proxy = MBProxy(name=in_queue,
                                 host_port_list=sconf['host_port_list'],
                                 destination=qconf['destination'],
-                                use_ssl=sconf['use_ssl'],
-                                cert_file=sconf['cert_file'],
-                                key_file=sconf['key_file'],
-                                username=sconf['username'],
-                                passcode=sconf['passcode'],
+                                use_ssl=sconf.get('use_ssl', False),
+                                cert_file=sconf.get('cert_file'),
+                                key_file=sconf.get('key_file'),
+                                username=sconf.get('username'),
+                                passcode=sconf.get('passcode'),
                                 vhost=sconf.get('vhost'),
-                                wait=True)
+                                wait=True,
+                                verbose=sconf.get('verbose', False),
+                                )
             mb_proxy_dict[in_queue] = mb_proxy
         # mb_sender_proxy instances
         mb_sender_proxy_dict = dict()
@@ -248,16 +264,18 @@ class MsgProcAgentBase(GenericThread):
             mb_sender_proxy = MBSenderProxy(name=out_queue,
                                             host_port_list=sconf['host_port_list'],
                                             destination=qconf['destination'],
-                                            use_ssl=sconf['use_ssl'],
-                                            cert_file=sconf['cert_file'],
-                                            key_file=sconf['key_file'],
-                                            username=sconf['username'],
-                                            passcode=sconf['passcode'],
+                                            use_ssl=sconf.get('use_ssl', False),
+                                            cert_file=sconf.get('cert_file'),
+                                            key_file=sconf.get('key_file'),
+                                            username=sconf.get('username'),
+                                            passcode=sconf.get('passcode'),
                                             vhost=sconf.get('vhost'),
-                                            wait=True)
+                                            wait=True,
+                                            verbose=sconf.get('verbose', False),
+                                            )
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
-        for proc in processors_dict.keys():
+        for proc in processor_attr_map.keys():
             in_queue = processor_attr_map[proc]['in_queue']
             if in_queue:
                 processor_attr_map[proc]['mb_proxy'] = mb_proxy_dict[in_queue]
@@ -265,7 +283,7 @@ class MsgProcAgentBase(GenericThread):
             if out_queue:
                 processor_attr_map[proc]['mb_sender_proxy'] = mb_sender_proxy_dict[out_queue]
         # set self attributes
-        self.init_processor_list = list(processors_dict.keys())
+        self.init_processor_list = list(processor_attr_map.keys())
         self.init_mb_proxy_list = list(mb_proxy_dict.values())
         self.init_mb_sender_proxy_list = list(mb_sender_proxy_dict.values())
         self.processor_attr_map = dict(processor_attr_map)
