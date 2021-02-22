@@ -232,11 +232,11 @@ class MsgProcAgentBase(GenericThread):
             mb_proxy = MBProxy(name=in_queue,
                                 host_port_list=sconf['host_port_list'],
                                 destination=qconf['destination'],
-                                use_ssl=sconf['use_ssl'],
-                                cert_file=sconf['cert_file'],
-                                key_file=sconf['key_file'],
-                                username=sconf['username'],
-                                passcode=sconf['passcode'],
+                                use_ssl=sconf.get('use_ssl', False),
+                                cert_file=sconf.get('cert_file'),
+                                key_file=sconf.get('key_file'),
+                                username=sconf.get('username'),
+                                passcode=sconf.get('passcode'),
                                 vhost=sconf.get('vhost'),
                                 wait=True)
             mb_proxy_dict[in_queue] = mb_proxy
@@ -248,11 +248,11 @@ class MsgProcAgentBase(GenericThread):
             mb_sender_proxy = MBSenderProxy(name=out_queue,
                                             host_port_list=sconf['host_port_list'],
                                             destination=qconf['destination'],
-                                            use_ssl=sconf['use_ssl'],
-                                            cert_file=sconf['cert_file'],
-                                            key_file=sconf['key_file'],
-                                            username=sconf['username'],
-                                            passcode=sconf['passcode'],
+                                            use_ssl=sconf.get('use_ssl', False),
+                                            cert_file=sconf.get('cert_file'),
+                                            key_file=sconf.get('key_file'),
+                                            username=sconf.get('username'),
+                                            passcode=sconf.get('passcode'),
                                             vhost=sconf.get('vhost'),
                                             wait=True)
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
