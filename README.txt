@@ -8,7 +8,7 @@ Release Note
 ------------
 
 * 0.0.21 (6/5/2021)
-  * to change panda.log all-writable to race condition between root and service account
+  * to change panda.log all-writable to avoid the ownership issue between root and service account when the service gets started
 
 * 0.0.20 (2/12/2020)
   * fixed logging.handlers
