@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.21 (6/5/2021)
+  * to change panda.log all-writable to race condition between root and service account
+
 * 0.0.20 (2/12/2020)
   * fixed logging.handlers
 
