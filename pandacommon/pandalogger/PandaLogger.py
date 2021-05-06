@@ -223,7 +223,8 @@ if len(_weblog.handlers) < 2:
         _newwebh.setLevel(logging.DEBUG)
         _newwebh.setFormatter(_formatter)
 
-    _txth = logging.FileHandler('%s/panda.log'%logger_config.daemon['logdir'])
+    tmp_file_path = os.path.join(logger_config.daemon['logdir'], 'panda.log')
+    _txth = logging.FileHandler(tmp_file_path)
     _txth.setLevel(logging.DEBUG)
     _txth.setFormatter(_formatter)
 
@@ -231,6 +232,11 @@ if len(_weblog.handlers) < 2:
     _weblog.addHandler(_allwebh)
     if 'loghost_new' in logger_config.daemon:
         _weblog.addHandler(_newwebh)
+    try:
+        # panda.log is owned by root if daemon is launched first
+        os.chmod(tmp_file_path, 0o666)
+    except Exception:
+        pass
 
 # no more HTTP handler
 del _PandaHTTPLogHandler
