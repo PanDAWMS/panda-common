@@ -98,6 +98,19 @@ class LogWrapper:
             msg += self.getMemoryUsage()
         self.logger.warning(msg)
 
+    def critical(self,msg):
+        msg = str(msg)
+        self.keepMsg(msg)
+        try:
+            if self.hook is not None:
+                self.hook.add_dialog_message(msg, 'CRITICAL', self.name, self.prefix)
+        except Exception:
+            pass
+        if self.prefix != '':
+            msg = self.prefix + ' ' + str(msg)
+        if self.seeMem:
+            msg += self.getMemoryUsage()
+        self.logger.critical(msg)
 
     def dumpToString(self):
         strMsg = ''
