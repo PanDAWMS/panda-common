@@ -224,7 +224,7 @@ if len(_weblog.handlers) < 2:
         _newwebh.setFormatter(_formatter)
 
     tmp_file_path = os.path.join(logger_config.daemon['logdir'], 'panda.log')
-    _txth = logging.FileHandler(tmp_file_path)
+    _txth = logging.FileHandler(tmp_file_path, encoding='utf-8')
     _txth.setLevel(logging.DEBUG)
     _txth.setFormatter(_formatter)
 
@@ -306,7 +306,7 @@ class PandaLogger:
             if newLogFlag and rotateLog:
                 txth.doRollover()
         else:
-            txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm))
+            txth = logging.FileHandler('%s/panda-%s.log'%(logger_config.daemon['logdir'],lognm), encoding='utf-8')
         if log_level in ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET']:
             log_level = getattr(logging, log_level)
             if newLogFlag:
