@@ -90,10 +90,9 @@ class WeightedLists(object):
 
     def pop(self):
         with self.lock:
-            if self.weights.empty():
-                return None
             weights = self.weights.get()
             if not weights:
+                self.weights.put(weights)
                 return None
             item = random.choices(list(weights.keys()), weights=list(weights.values()))[0]
             data = self.data.get()
