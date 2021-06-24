@@ -2,6 +2,8 @@ import os
 import threading
 import socket
 import datetime
+import random
+import multiprocessing
 
 
 class GenericThread(threading.Thread):
@@ -53,3 +55,53 @@ class MapWithLockAndTimeout(dict):
             except Exception:
                 pass
         return False
+
+
+# weighted lists
+class WeightedLists(object):
+
+    def __init__(self, lock):
+        self.lock = multiprocessing.Lock()
+        self.data = multiprocessing.Queue()
+        self.data.put(dict())
+        self.weights = multiprocessing.Queue()
+        self.weights.put(dict())
+
+    def __len__(self):
+        with self.lock:
+            l = 0
+            data = self.data.get()
+            for item in data:
+                l += len(data[item])
+            self.data.put(data)
+            return l
+
+    def add(self, weight, list_data):
+        if not list_data or weight <= 0:
+            return
+        with self.lock:
+            data = self.data.get()
+            weights = self.weights.get()
+            item = len(weights)
+            weights[item] = weight
+            data[item] = list_data
+            self.weights.put(weights)
+            self.data.put(data)
+
+    def pop(self):
+        with self.lock:
+            if self.weights.empty():
+                return None
+            weights = self.weights.get()
+            if not weights:
+                return None
+            item = random.choices(list(weights.keys()), weights=list(weights.values()))[0]
+            data = self.data.get()
+            d = data[item].pop()
+            # delete empty
+            if not data[item]:
+                del data[item]
+                del weights[item]
+            self.weights.put(weights)
+            self.data.put(data)
+            return d
