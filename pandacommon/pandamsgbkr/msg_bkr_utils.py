@@ -393,7 +393,7 @@ class MBSenderProxy(object):
         get a connection and a listener
         """
         conn_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
-        self.conn_id, self.conn = random.choice([conn_dict.items()])
+        self.conn_id, self.conn = random.choice(list(conn_dict.items()))
         self.listener = MsgListener(mb_proxy=self, conn_id=self.conn, verbose=self.verbose)
         self.logger.debug('got connection about {0}'.format(self.conn_id))
 
