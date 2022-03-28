@@ -195,13 +195,13 @@ class MsgListener(stomp.ConnectionListener):
 
 
 # message broker proxy for receiver
-class MBProxy(object):
+class MBListenerProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False, conn_mode='all',
                     verbose=False):
         # logger
-        self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBProxy')
+        self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBListenerProxy')
         # name of message queue
         self.name = name
         # connection parameters
@@ -213,7 +213,7 @@ class MBProxy(object):
         # destination queue to subscribe
         self.destination = destination
         # subscription ID
-        self.sub_id = 'panda-MBProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
+        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
@@ -313,7 +313,7 @@ class MBProxy(object):
         self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
         self.got_disconnected = True
 
-    def go(self):
+    def go(self, to_subscribe=True):
         self.logger.debug('go called')
         self.to_disconnect = False
         for conn_id, conn in self.connection_dict.items():
@@ -323,7 +323,8 @@ class MBProxy(object):
                     self.got_disconnected = False
                     conn.set_listener(listener.__class__.__name__, listener)
                     conn.connect(**self.connect_params)
-                    conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
+                    if to_subscribe:
+                        conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
                     self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
                 else:
                     self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
@@ -351,6 +352,30 @@ class MBProxy(object):
         self._get_connections()
         self.go()
         self.logger.info('the {0}th restart ended'.format(self.n_restart))
+
+    def get_messages(self, duration=0.125, limit=100):
+        """
+        subscribe for duration time and unsubscribe; then get some messages capped by limit from local buffer
+        return list of message objects
+        """
+        self.logger.debug('get_messages called')
+        # subscribe
+        for conn_id, conn in self.connection_dict.items():
+            conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
+        # wait, expect that some messages from MB will come and be put into local buffer
+        time.sleep(duration)
+        # unsubscribe
+        for conn_id, conn in self.connection_dict.items():
+            conn.unsubscribe(id=self.sub_id)
+        # get messages from local buffer
+        msg_list = []
+        for j in range(limit):
+            msg_obj = self.msg_buffer.get()
+            if msg_obj is None:
+                break
+            msg_list.append(msg_obj)
+        self.logger.debug('got {n} messages for {t} sec'.format(n=len(msg_list), t=duration))
+        return msg_list
 
 
 # message broker proxy for sender, waster...
