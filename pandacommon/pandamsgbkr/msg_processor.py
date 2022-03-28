@@ -14,7 +14,7 @@ base_logger = logger_utils.setup_logger('msg_processor')
 
 
 # get mb proxy instance
-def get_mb_proxy(name, sconf, qconf, mode='listener'):
+def get_mb_proxy(name, sconf, qconf, mode='listener', **kwargs):
     """
     get MBListenerProxy or MBSenderProxy instance according to config dict
     """
@@ -35,6 +35,7 @@ def get_mb_proxy(name, sconf, qconf, mode='listener'):
                             vhost=sconf.get('vhost'),
                             wait=True,
                             verbose=sconf.get('verbose', False),
+                            **kwargs
                         )
     return mb_proxy
 
@@ -189,6 +190,7 @@ class MsgProcAgentBase(GenericThread):
         self.processor_thread_map = dict()
         self.guard_period = 300
         self._last_guard_timestamp = 0
+        self.prefetch_count = None
         # log
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='__init__')
         # parse config
@@ -489,9 +491,12 @@ class MsgProcAgentBase(GenericThread):
         self._kill_processors(self.init_processor_list)
         tmp_logger.debug('done')
 
-    def start_passive_mode(self, in_q_list=tuple(), out_q_list=tuple()):
+    def start_passive_mode(self, in_q_list=tuple(), out_q_list=tuple(), prefetch_size=100):
         """
         start passive mode: only spwan mb proxies (without spawning agent and plugin threads)
+        in_q_list: list of inward queue name
+        out_q_list: list of outward queue name
+        prefetch_size: prefetch size of the message broker (can control number of un-acknowledged messages stored in the local buffer)
         returns dict of mb proxies
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='start_passive_mode')
@@ -503,7 +508,7 @@ class MsgProcAgentBase(GenericThread):
         for in_queue in in_q_list:
             qconf = self._queues_dict[in_queue]
             sconf = self._mb_servers_dict[qconf['server']]
-            mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='listener')
+            mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='listener', prefetch_size=prefetch_size)
             mb_listener_proxy_dict[in_queue] = mb_listener_proxy
         # mb_sender_proxy instances
         mb_sender_proxy_dict = dict()

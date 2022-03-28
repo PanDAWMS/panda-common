@@ -229,7 +229,7 @@ class MBListenerProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False, conn_mode='all',
-                    verbose=False):
+                    prefetch_size=None, verbose=False, **kwargs):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBListenerProxy')
         # name of message queue
@@ -271,6 +271,10 @@ class MBListenerProxy(object):
         self.to_disconnect = False
         # whether to log verbosely
         self.verbose = verbose
+        # prefetch count of the MB (max number of un-acknowledge messages allowed)
+        self.prefetch_size = prefetch_size
+        # evaluate subscription headers
+        self._evaluate_subscription_headers()
         # get connections
         self._get_connections()
 
@@ -293,6 +297,14 @@ class MBListenerProxy(object):
             self.listener_dict[conn_id] = listener
             self.logger.debug('got connection about {0}'.format(conn_id))
         self.logger.debug('done')
+
+    def _evaluate_subscription_headers(self):
+        self.subscription_headers = {}
+        if self.prefetch_size is not None:
+            self.subscription_headers.update({
+                    'activemq.prefetchSize': self.prefetch_size, # for ActiveMQ
+                    'prefetch-count': self.prefetch_size, # for RabbitMQ
+                })
 
     def _begin(self, conn_id):
         conn = self.connection_dict[conn_id]
@@ -353,7 +365,8 @@ class MBListenerProxy(object):
                     self.got_disconnected = False
                     conn.set_listener(listener.__class__.__name__, listener)
                     conn.connect(**self.connect_params)
-                    conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
+                    conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual',
+                                    headers=self.subscription_headers)
                     self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
                 else:
                     self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
@@ -405,7 +418,7 @@ class MBListenerProxy(object):
 class MBSenderProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
-                    username=None, passcode=None, wait=True, verbose=False):
+                    username=None, passcode=None, wait=True, verbose=False, **kwargs):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBSenderProxy')
         # name of message queue
