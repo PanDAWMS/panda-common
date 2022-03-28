@@ -33,10 +33,6 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
     get dict {conn_id: connection}
     """
     tmp_logger = logger_utils.make_logger(base_logger, method_name='_get_connection_dict')
-    ssl_opts = {'use_ssl' : use_ssl,
-                'ssl_version' : ssl.PROTOCOL_TLSv1,
-                'ssl_cert_file' : cert_file,
-                'ssl_key_file'  : key_file}
     conn_dict = dict()
     # resolve all distinct hosts behind hostname
     resolved_host_port_set = set()
@@ -52,7 +48,24 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
         host_port = '{0}:{1}'.format(host, port)
         conn_id = host_port
         if conn_id not in conn_dict:
-            conn = stomp.Connection12(host_and_ports = [(host, port)], vhost=vhost, **ssl_opts)
+            try:
+                conn = stomp.Connection12(host_and_ports = [(host, port)], vhost=vhost)
+                if use_ssl:
+                    ssl_opts = {
+                                'ssl_version' : ssl.PROTOCOL_TLSv1,
+                                'cert_file' : cert_file,
+                                'key_file'  : key_file
+                                }
+                    conn.set_ssl(**ssl_opts)
+            except AttributeError:
+                # Older version of stomp.py
+                ssl_opts = {
+                            'use_ssl' : use_ssl,
+                            'ssl_version' : ssl.PROTOCOL_TLSv1,
+                            'ssl_cert_file' : cert_file,
+                            'ssl_key_file'  : key_file
+                            }
+                conn = stomp.Connection12(host_and_ports = [(host, port)], vhost=vhost, **ssl_opts)
             conn_dict[conn_id] = conn
     tmp_logger.debug('got {0} connections to {1}'.format(len(conn_dict), ' , '.join(conn_dict.keys())))
     return conn_dict
@@ -169,8 +182,23 @@ class MsgListener(stomp.ConnectionListener):
         # whether log verbosely
         self.verbose = kwargs.get('verbose', False)
 
-    def on_error(self, headers, message):
-        self.logger.error('on_error start: {h} "{m}"'.format(h=headers, m=message))
+    def _parse_args(self, args):
+        """
+        Parse the args for different versions of stomp.py
+        return (cmd, headers, body)
+        """
+        if len(args) == 1:
+            # [frame] : in newer version
+            frame = args[0]
+            return (frame.cmd, frame.headers, frame.body)
+        elif len(args) == 2:
+            # [headers, message] : in older version
+            headers, message = args
+            return (None, headers, message)
+
+    def on_error(self, *args):
+        cmd, headers, body = self._parse_args(args)
+        self.logger.error('on_error start: {h} "{b}"'.format(h=headers, b=body))
         self.logger.error('on_error done: {h}'.format(h=headers))
 
     def on_disconnected(self):
@@ -178,18 +206,20 @@ class MsgListener(stomp.ConnectionListener):
         self.mb_proxy._on_disconnected(conn_id=self.conn_id)
         self.logger.info('on_disconnected done')
 
-    def on_send(self, frame):
-        obscured_headers = frame.headers
-        if 'passcode' in frame.headers:
-            obscured_headers = copy.deepcopy(frame.headers)
+    def on_send(self, *args):
+        cmd, headers, body = self._parse_args(args)
+        obscured_headers = headers
+        if 'passcode' in headers:
+            obscured_headers = copy.deepcopy(headers)
             obscured_headers['passcode'] = '********'
         if self.verbose:
-            self.logger.debug('on_send frame: {0} {1} "{2}"'.format(frame.cmd, obscured_headers, frame.body))
+            self.logger.debug('on_send frame: {0} {1} "{2}"'.format(cmd, obscured_headers, body))
 
-    def on_message(self, headers, message):
+    def on_message(self, *args):
+        cmd, headers, body = self._parse_args(args)
         if self.verbose:
-            self.logger.debug('on_message start: {h} "{m}"'.format(h=headers, m=message))
-        self.mb_proxy._on_message(headers, message, conn_id=self.conn_id)
+            self.logger.debug('on_message start: {h} "{b}"'.format(h=headers, b=body))
+        self.mb_proxy._on_message(headers, body, conn_id=self.conn_id)
         if self.verbose:
             self.logger.debug('on_message done: {h}'.format(h=headers))
 
@@ -295,8 +325,8 @@ class MBListenerProxy(object):
             conn.nack(ack_id)
             self.logger.warning('{conid} {mid} {ackid} NACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
-    def _on_message(self, headers, message, conn_id):
-        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=message)
+    def _on_message(self, headers, body, conn_id):
+        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=body)
         if self.verbose:
             self.logger.debug('_on_message from {c} made message object: {h}'.format(c=conn_id, h=headers))
         if self.skip_buffer:
@@ -313,7 +343,7 @@ class MBListenerProxy(object):
         self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
         self.got_disconnected = True
 
-    def go(self, to_subscribe=True):
+    def go(self):
         self.logger.debug('go called')
         self.to_disconnect = False
         for conn_id, conn in self.connection_dict.items():
@@ -323,8 +353,7 @@ class MBListenerProxy(object):
                     self.got_disconnected = False
                     conn.set_listener(listener.__class__.__name__, listener)
                     conn.connect(**self.connect_params)
-                    if to_subscribe:
-                        conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
+                    conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
                     self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
                 else:
                     self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
@@ -353,21 +382,13 @@ class MBListenerProxy(object):
         self.go()
         self.logger.info('the {0}th restart ended'.format(self.n_restart))
 
-    def get_messages(self, duration=0.125, limit=100):
+    def get_messages(self, limit=100):
         """
-        subscribe for duration time and unsubscribe; then get some messages capped by limit from local buffer
+        get some messages capped by limit from local buffer
         return list of message objects
         """
         if self.verbose:
             self.logger.debug('get_messages called')
-        # subscribe
-        for conn_id, conn in self.connection_dict.items():
-            conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
-        # wait, expect that some messages from MB will come and be put into local buffer
-        time.sleep(duration)
-        # unsubscribe
-        for conn_id, conn in self.connection_dict.items():
-            conn.unsubscribe(id=self.sub_id)
         # get messages from local buffer
         msg_list = []
         for j in range(limit):
@@ -376,7 +397,7 @@ class MBListenerProxy(object):
                 break
             msg_list.append(msg_obj)
         if self.verbose:
-            self.logger.debug('got {n} messages for {t} sec'.format(n=len(msg_list), t=duration))
+            self.logger.debug('got {n} messages'.format(n=len(msg_list)))
         return msg_list
 
 
@@ -424,9 +445,9 @@ class MBSenderProxy(object):
         self.listener = MsgListener(mb_proxy=self, conn_id=self.conn_id, verbose=self.verbose)
         self.logger.debug('got connection about {0}'.format(self.conn_id))
 
-    def _on_message(self, headers, message):
+    def _on_message(self, headers, body):
         if self.verbose:
-            self.logger.debug('_on_message drop message: {h} "{m}"'.format(h=headers, m=message))
+            self.logger.debug('_on_message drop message: {h} "{b}"'.format(h=headers, b=body))
 
     def _on_disconnected(self):
         self.logger.debug('_on_disconnected called')
