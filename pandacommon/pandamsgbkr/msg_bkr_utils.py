@@ -358,7 +358,8 @@ class MBListenerProxy(object):
         subscribe for duration time and unsubscribe; then get some messages capped by limit from local buffer
         return list of message objects
         """
-        self.logger.debug('get_messages called')
+        if self.verbose:
+            self.logger.debug('get_messages called')
         # subscribe
         for conn_id, conn in self.connection_dict.items():
             conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual')
@@ -374,7 +375,8 @@ class MBListenerProxy(object):
             if msg_obj is None:
                 break
             msg_list.append(msg_obj)
-        self.logger.debug('got {n} messages for {t} sec'.format(n=len(msg_list), t=duration))
+        if self.verbose:
+            self.logger.debug('got {n} messages for {t} sec'.format(n=len(msg_list), t=duration))
         return msg_list
 
 
@@ -419,7 +421,7 @@ class MBSenderProxy(object):
         """
         conn_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
         self.conn_id, self.conn = random.choice(list(conn_dict.items()))
-        self.listener = MsgListener(mb_proxy=self, conn_id=self.conn, verbose=self.verbose)
+        self.listener = MsgListener(mb_proxy=self, conn_id=self.conn_id, verbose=self.verbose)
         self.logger.debug('got connection about {0}'.format(self.conn_id))
 
     def _on_message(self, headers, message):

@@ -510,7 +510,7 @@ class MsgProcAgentBase(GenericThread):
         for out_queue in out_q_list:
             qconf = self._queues_dict[out_queue]
             sconf = self._mb_servers_dict[qconf['server']]
-            mb_sender_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='sender')
+            mb_sender_proxy = get_mb_proxy(name=out_queue, sconf=sconf, qconf=qconf, mode='sender')
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # spawn message broker listener proxy connections, without auto-subscribe
         for queue_name, mb_proxy in mb_listener_proxy_dict.items():
@@ -519,7 +519,7 @@ class MsgProcAgentBase(GenericThread):
         # spawn message broker sender proxy connections
         for queue_name, mb_proxy in mb_sender_proxy_dict.items():
             mb_proxy.go()
-            mp_logger.debug('spawned sender proxy for {0}'.format(queue_name))
+            tmp_logger.debug('spawned sender proxy for {0}'.format(queue_name))
         tmp_logger.debug('done')
         # return
         return {
