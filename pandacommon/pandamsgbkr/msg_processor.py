@@ -217,6 +217,7 @@ class MsgProcAgentBase(GenericThread):
             }
         queues_dict = {
                 'Queue_1': {
+                    'enable': True,
                     'server': 'Server_1',
                     'destination': '/queue/some_queue',
                 },
@@ -280,6 +281,8 @@ class MsgProcAgentBase(GenericThread):
         mb_listener_proxy_dict = dict()
         for in_queue in in_q_set:
             qconf = self._queues_dict[in_queue]
+            if not qconf.get('enable', True):
+                continue
             sconf = self._mb_servers_dict[qconf['server']]
             mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='listener')
             mb_listener_proxy_dict[in_queue] = mb_listener_proxy
@@ -287,6 +290,8 @@ class MsgProcAgentBase(GenericThread):
         mb_sender_proxy_dict = dict()
         for out_queue in out_q_set:
             qconf = self._queues_dict[out_queue]
+            if not qconf.get('enable', True):
+                continue
             sconf = self._mb_servers_dict[qconf['server']]
             mb_sender_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='sender')
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
@@ -491,7 +496,7 @@ class MsgProcAgentBase(GenericThread):
         self._kill_processors(self.init_processor_list)
         tmp_logger.debug('done')
 
-    def start_passive_mode(self, in_q_list=tuple(), out_q_list=tuple(), prefetch_size=100):
+    def start_passive_mode(self, in_q_list=None, out_q_list=None, prefetch_size=100):
         """
         start passive mode: only spwan mb proxies (without spawning agent and plugin threads)
         in_q_list: list of inward queue name
@@ -503,10 +508,17 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger.debug('start')
         # initialize
         # self.initialize()
+        all_queue_names = list(self._queues_dict.keys())
+        if in_q_list is None:
+            in_q_list = all_queue_names
+        if out_q_list is None:
+            out_q_list = all_queue_names
         # mb_listener_proxy instances
         mb_listener_proxy_dict = dict()
         for in_queue in in_q_list:
             qconf = self._queues_dict[in_queue]
+            if not qconf.get('enable', True):
+                continue
             sconf = self._mb_servers_dict[qconf['server']]
             mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='listener', prefetch_size=prefetch_size)
             mb_listener_proxy_dict[in_queue] = mb_listener_proxy
@@ -514,6 +526,8 @@ class MsgProcAgentBase(GenericThread):
         mb_sender_proxy_dict = dict()
         for out_queue in out_q_list:
             qconf = self._queues_dict[out_queue]
+            if not qconf.get('enable', True):
+                continue
             sconf = self._mb_servers_dict[qconf['server']]
             mb_sender_proxy = get_mb_proxy(name=out_queue, sconf=sconf, qconf=qconf, mode='sender')
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
