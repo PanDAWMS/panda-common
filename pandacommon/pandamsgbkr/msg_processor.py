@@ -243,7 +243,10 @@ class MsgProcAgentBase(GenericThread):
             raw_dict = json.load(_f)
         self._mb_servers_dict = raw_dict['mb_servers']
         self._queues_dict = raw_dict['queues']
-        self._processors_dict = raw_dict['processors']
+        self._processors_dict = raw_dict.get('processors', {})
+        # set self optional attributes
+        if raw_dict.get('guard_period') is not None:
+            self.guard_period = raw_dict['guard_period']
         tmp_logger.debug('done')
 
     def _setup_instances(self):
@@ -308,9 +311,6 @@ class MsgProcAgentBase(GenericThread):
         self.init_mb_listener_proxy_list = list(mb_listener_proxy_dict.values())
         self.init_mb_sender_proxy_list = list(mb_sender_proxy_dict.values())
         self.processor_attr_map = dict(processor_attr_map)
-        # set self optional attributes
-        if raw_dict.get('guard_period') is not None:
-            self.guard_period = raw_dict['guard_period']
         # tear down
         del in_q_set, out_q_set, mb_listener_proxy_dict, mb_sender_proxy_dict, processor_attr_map
         tmp_logger.debug('done')
