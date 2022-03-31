@@ -56,7 +56,7 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
                                 'cert_file' : cert_file,
                                 'key_file'  : key_file
                                 }
-                    conn.set_ssl(**ssl_opts)
+                    conn.set_ssl(for_hosts=[(host, port)], **ssl_opts)
             except AttributeError:
                 # Older version of stomp.py
                 ssl_opts = {
