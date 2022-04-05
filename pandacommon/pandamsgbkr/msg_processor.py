@@ -296,7 +296,7 @@ class MsgProcAgentBase(GenericThread):
             if not qconf.get('enable', True):
                 continue
             sconf = self._mb_servers_dict[qconf['server']]
-            mb_sender_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='sender')
+            mb_sender_proxy = get_mb_proxy(name=out_queue, sconf=sconf, qconf=qconf, mode='sender')
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
         for proc in processor_attr_map.keys():
