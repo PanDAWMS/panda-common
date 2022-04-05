@@ -198,8 +198,7 @@ class MsgListener(stomp.ConnectionListener):
 
     def on_error(self, *args):
         cmd, headers, body = self._parse_args(args)
-        self.logger.error('on_error start: {h} "{b}"'.format(h=headers, b=body))
-        self.logger.error('on_error done: {h}'.format(h=headers))
+        self.logger.error('on_error : {h} | {b}'.format(h=headers, b=body))
 
     def on_disconnected(self):
         self.logger.info('on_disconnected start')
@@ -213,12 +212,12 @@ class MsgListener(stomp.ConnectionListener):
             obscured_headers = copy.deepcopy(headers)
             obscured_headers['passcode'] = '********'
         if self.verbose:
-            self.logger.debug('on_send frame: {0} {1} "{2}"'.format(cmd, obscured_headers, body))
+            self.logger.debug('on_send frame: {0} {1} | {2}'.format(cmd, obscured_headers, body))
 
     def on_message(self, *args):
         cmd, headers, body = self._parse_args(args)
         if self.verbose:
-            self.logger.debug('on_message start: {h} "{b}"'.format(h=headers, b=body))
+            self.logger.debug('on_message start: {h} | {b}'.format(h=headers, b=body))
         self.mb_proxy._on_message(headers, body, conn_id=self.conn_id)
         if self.verbose:
             self.logger.debug('on_message done: {h}'.format(h=headers))
@@ -460,7 +459,7 @@ class MBSenderProxy(object):
 
     def _on_message(self, headers, body, conn_id):
         if self.verbose:
-            self.logger.debug('_on_message from {c} drop message: {h} "{b}"'.format(c=conn_id, h=headers, b=body))
+            self.logger.debug('_on_message from {c} drop message: {h} | {b}'.format(c=conn_id, h=headers, b=body))
 
     def _on_disconnected(self, conn_id):
         self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
@@ -472,7 +471,7 @@ class MBSenderProxy(object):
         """
         self.conn.send(destination=self.destination, body=data)
         if self.verbose:
-            self.logger.debug('send to {dest} "{data}"'.format(dest=self.destination, data=data))
+            self.logger.debug('send to {dest} | {data}'.format(dest=self.destination, data=data))
 
     def waste(self, duration=3):
         """
