@@ -49,7 +49,7 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
         conn_id = host_port
         if conn_id not in conn_dict:
             try:
-                conn = stomp.Connection12(host_and_ports = [(host, port)], vhost=vhost)
+                conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost)
                 if use_ssl:
                     ssl_opts = {
                                 'ssl_version' : ssl.PROTOCOL_TLSv1,
@@ -65,7 +65,7 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
                             'ssl_cert_file' : cert_file,
                             'ssl_key_file'  : key_file
                             }
-                conn = stomp.Connection12(host_and_ports = [(host, port)], vhost=vhost, **ssl_opts)
+                conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost, **ssl_opts)
             conn_dict[conn_id] = conn
     tmp_logger.debug('got {0} connections to {1}'.format(len(conn_dict), ' , '.join(conn_dict.keys())))
     return conn_dict
@@ -458,12 +458,12 @@ class MBSenderProxy(object):
         self.listener = MsgListener(mb_proxy=self, conn_id=self.conn_id, verbose=self.verbose)
         self.logger.debug('got connection about {0}'.format(self.conn_id))
 
-    def _on_message(self, headers, body):
+    def _on_message(self, headers, body, conn_id):
         if self.verbose:
-            self.logger.debug('_on_message drop message: {h} "{b}"'.format(h=headers, b=body))
+            self.logger.debug('_on_message from {c} drop message: {h} "{b}"'.format(c=conn_id, h=headers, b=body))
 
-    def _on_disconnected(self):
-        self.logger.debug('_on_disconnected called')
+    def _on_disconnected(self, conn_id):
+        self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
         self.got_disconnected = True
 
     def send(self, data):
