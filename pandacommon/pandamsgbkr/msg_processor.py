@@ -4,13 +4,40 @@ import socket
 import json
 import logging
 
-from .msg_bkr_utils import MsgBuffer, MBProxy, MBSenderProxy
+from .msg_bkr_utils import MsgBuffer, MBListenerProxy, MBSenderProxy
 from pandacommon.pandautils.thread_utils import GenericThread
 from pandacommon.pandautils.plugin_factory import PluginFactory
 from pandacommon.pandalogger import logger_utils
 
 # logger
 base_logger = logger_utils.setup_logger('msg_processor')
+
+
+# get mb proxy instance
+def get_mb_proxy(name, sconf, qconf, mode='listener', **kwargs):
+    """
+    get MBListenerProxy or MBSenderProxy instance according to config dict
+    """
+    # class of mb proxy
+    the_class = MBListenerProxy
+    if mode == 'sender':
+        the_class = MBSenderProxy
+    # instantiate
+    mb_proxy = the_class(
+                            name=name,
+                            host_port_list=sconf['host_port_list'],
+                            destination=qconf['destination'],
+                            use_ssl=sconf.get('use_ssl', False),
+                            cert_file=sconf.get('cert_file'),
+                            key_file=sconf.get('key_file'),
+                            username=sconf.get('username'),
+                            passcode=sconf.get('passcode'),
+                            vhost=sconf.get('vhost'),
+                            wait=True,
+                            verbose=sconf.get('verbose', False),
+                            **kwargs
+                        )
+    return mb_proxy
 
 
 # simple message processor plugin Base
@@ -156,21 +183,24 @@ class MsgProcAgentBase(GenericThread):
         self.__to_run = True
         self.config_file = config_file
         self.process_sleep_time = process_sleep_time
-        self.init_mb_proxy_list = []
+        self.init_mb_listener_proxy_list = []
         self.init_mb_sender_proxy_list = []
         self.init_processor_list = []
         self.processor_attr_map = dict()
         self.processor_thread_map = dict()
         self.guard_period = 300
         self._last_guard_timestamp = 0
+        self.prefetch_count = None
         # log
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='__init__')
+        # parse config
+        self._parse_config()
         # done
         tmp_logger.info('done')
 
-    def _set_from_config(self):
+    def _parse_config(self):
         """
-        parse message processor configuration json file and set attributes accordingly
+        parse message processor configuration json file
         Typical example dict from config json:
         mb_servers_dict = {
                 'Server_1': {
@@ -187,6 +217,7 @@ class MsgProcAgentBase(GenericThread):
             }
         queues_dict = {
                 'Queue_1': {
+                    'enable': True,
                     'server': 'Server_1',
                     'destination': '/queue/some_queue',
                 },
@@ -205,20 +236,32 @@ class MsgProcAgentBase(GenericThread):
             }
         """
         # logger
-        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_set_from_config')
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_parse_config')
         tmp_logger.debug('start')
         # parse config json
         with open(self.config_file, 'r') as _f:
             raw_dict = json.load(_f)
-        mb_servers_dict = raw_dict['mb_servers']
-        queues_dict = raw_dict['queues']
-        processors_dict = raw_dict['processors']
+        self._mb_servers_dict = raw_dict['mb_servers']
+        self._queues_dict = raw_dict['queues']
+        self._processors_dict = raw_dict.get('processors', {})
+        # set self optional attributes
+        if raw_dict.get('guard_period') is not None:
+            self.guard_period = raw_dict['guard_period']
+        tmp_logger.debug('done')
+
+    def _setup_instances(self):
+        """
+        set up attributes and MBListenerProxy/plugin instances accordingly
+        """
+        # logger
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_setup_instances')
+        tmp_logger.debug('start')
         # processor thread attribute dict
         processor_attr_map = dict()
         # inward/outward queues and plugin instances
         in_q_set = set()
         out_q_set = set()
-        for proc, pconf in processors_dict.items():
+        for proc, pconf in self._processors_dict.items():
             # skip if not enabled
             if not pconf.get('enable', True):
                 continue
@@ -237,97 +280,75 @@ class MsgProcAgentBase(GenericThread):
             processor_attr_map[proc]['in_queue'] = in_queue
             processor_attr_map[proc]['out_queue'] = out_queue
             processor_attr_map[proc]['plugin'] = plugin
-
-        # mb_proxy instances
-        mb_proxy_dict = dict()
+        # mb_listener_proxy instances
+        mb_listener_proxy_dict = dict()
         for in_queue in in_q_set:
-            qconf = queues_dict[in_queue]
-            sconf = mb_servers_dict[qconf['server']]
-            mb_proxy = MBProxy(name=in_queue,
-                                host_port_list=sconf['host_port_list'],
-                                destination=qconf['destination'],
-                                use_ssl=sconf.get('use_ssl', False),
-                                cert_file=sconf.get('cert_file'),
-                                key_file=sconf.get('key_file'),
-                                username=sconf.get('username'),
-                                passcode=sconf.get('passcode'),
-                                vhost=sconf.get('vhost'),
-                                wait=True,
-                                verbose=sconf.get('verbose', False),
-                                )
-            mb_proxy_dict[in_queue] = mb_proxy
+            qconf = self._queues_dict[in_queue]
+            if not qconf.get('enable', True):
+                continue
+            sconf = self._mb_servers_dict[qconf['server']]
+            mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='listener')
+            mb_listener_proxy_dict[in_queue] = mb_listener_proxy
         # mb_sender_proxy instances
         mb_sender_proxy_dict = dict()
         for out_queue in out_q_set:
-            qconf = queues_dict[out_queue]
-            sconf = mb_servers_dict[qconf['server']]
-            mb_sender_proxy = MBSenderProxy(name=out_queue,
-                                            host_port_list=sconf['host_port_list'],
-                                            destination=qconf['destination'],
-                                            use_ssl=sconf.get('use_ssl', False),
-                                            cert_file=sconf.get('cert_file'),
-                                            key_file=sconf.get('key_file'),
-                                            username=sconf.get('username'),
-                                            passcode=sconf.get('passcode'),
-                                            vhost=sconf.get('vhost'),
-                                            wait=True,
-                                            verbose=sconf.get('verbose', False),
-                                            )
+            qconf = self._queues_dict[out_queue]
+            if not qconf.get('enable', True):
+                continue
+            sconf = self._mb_servers_dict[qconf['server']]
+            mb_sender_proxy = get_mb_proxy(name=out_queue, sconf=sconf, qconf=qconf, mode='sender')
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
         for proc in processor_attr_map.keys():
             in_queue = processor_attr_map[proc]['in_queue']
             if in_queue:
-                processor_attr_map[proc]['mb_proxy'] = mb_proxy_dict[in_queue]
+                processor_attr_map[proc]['mb_listener_proxy'] = mb_listener_proxy_dict[in_queue]
             out_queue = processor_attr_map[proc]['out_queue']
             if out_queue:
                 processor_attr_map[proc]['mb_sender_proxy'] = mb_sender_proxy_dict[out_queue]
         # set self attributes
         self.init_processor_list = list(processor_attr_map.keys())
-        self.init_mb_proxy_list = list(mb_proxy_dict.values())
+        self.init_mb_listener_proxy_list = list(mb_listener_proxy_dict.values())
         self.init_mb_sender_proxy_list = list(mb_sender_proxy_dict.values())
         self.processor_attr_map = dict(processor_attr_map)
-        # set self optional attributes
-        if raw_dict.get('guard_period') is not None:
-            self.guard_period = raw_dict['guard_period']
         # tear down
-        del in_q_set, out_q_set, mb_proxy_dict, mb_sender_proxy_dict, processor_attr_map
+        del in_q_set, out_q_set, mb_listener_proxy_dict, mb_sender_proxy_dict, processor_attr_map
         tmp_logger.debug('done')
 
-    def _spawn_listeners(self, mb_proxy_list):
+    def _spawn_listeners(self, mb_listener_proxy_list):
         """
-        spawn connection/listener threads of certain message broker proxy
+        spawn connection/listener threads of certain message broker listener proxy
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_spawn_listeners')
         tmp_logger.debug('start')
-        for mb_proxy in mb_proxy_list:
+        for mb_proxy in mb_listener_proxy_list:
             mb_proxy.go()
             tmp_logger.info('spawned listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
-    def _guard_listeners(self, mb_proxy_list):
+    def _guard_listeners(self, mb_listener_proxy_list):
         """
-        guard connection/listener threads of certain message broker proxy, reconnect when disconnected
+        guard connection/listener threads of certain message broker listener proxy, reconnect when disconnected
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_guard_listeners')
         tmp_logger.debug('start')
-        for mb_proxy in mb_proxy_list:
+        for mb_proxy in mb_listener_proxy_list:
             if mb_proxy.got_disconnected and not mb_proxy.to_disconnect:
-                tmp_logger.debug('found listner {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
+                tmp_logger.debug('found listener {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
                 mb_proxy.restart()
                 if mb_proxy.n_restart > 10:
-                    tmp_logger.warning('found listner {0} keep getting disconnected; already restarted {1} times'.format(
+                    tmp_logger.warning('found listener {0} keep getting disconnected; already restarted {1} times'.format(
                                                                                         mb_proxy.name, mb_proxy.n_restart))
                 tmp_logger.info('restarted listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
-    def _kill_listeners(self, mb_proxy_list):
+    def _kill_listeners(self, mb_listener_proxy_list):
         """
-        kill connection/listener threads of certain message broker proxy
+        kill connection/listener threads of certain message broker listener proxy
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_kill_listeners')
         tmp_logger.debug('start')
-        for mb_proxy in mb_proxy_list:
+        for mb_proxy in mb_listener_proxy_list:
             mb_proxy.stop()
             tmp_logger.info('signaled stop to listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
@@ -351,10 +372,10 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             if mb_proxy.got_disconnected and not mb_proxy.to_disconnect:
-                tmp_logger.debug('found listner {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
+                tmp_logger.debug('found listener {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
                 mb_proxy.restart()
                 if mb_proxy.n_restart > 10:
-                    tmp_logger.warning('found listner {0} keep getting disconnected; already restarted {1} times'.format(
+                    tmp_logger.warning('found listener {0} keep getting disconnected; already restarted {1} times'.format(
                                                                                         mb_proxy.name, mb_proxy.n_restart))
                 tmp_logger.info('restarted listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
@@ -445,12 +466,12 @@ class MsgProcAgentBase(GenericThread):
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='run')
         tmp_logger.debug('start')
-        # set attributes from config
-        self._set_from_config()
+        # set up instances from config
+        self._setup_instances()
         # initialize
         self.initialize()
-        # spawn all message broker proxy threads
-        self._spawn_listeners(self.init_mb_proxy_list)
+        # spawn all message broker listener proxy threads
+        self._spawn_listeners(self.init_mb_listener_proxy_list)
         # spawn all message broker sender proxy threads
         self._spawn_senders(self.init_mb_sender_proxy_list)
         # spawn all processor threads according to config
@@ -460,17 +481,67 @@ class MsgProcAgentBase(GenericThread):
         while self.__to_run:
             # guard listeners and senders
             if time.time() >= self._last_guard_timestamp + self.guard_period:
-                self._guard_listeners(self.init_mb_proxy_list)
+                self._guard_listeners(self.init_mb_listener_proxy_list)
                 self._guard_senders(self.init_mb_sender_proxy_list)
                 self._last_guard_timestamp = time.time()
             # sleep
             time.sleep(0.01)
         # tear down
         tmp_logger.debug('tearing down')
-        # kill all message broker proxy threads
-        self._kill_listeners(self.init_mb_proxy_list)
+        # kill all message broker listener proxy threads
+        self._kill_listeners(self.init_mb_listener_proxy_list)
         # kill all message broker sender proxy threads
         self._kill_senders(self.init_mb_sender_proxy_list)
         # kill all processor threads according to config
         self._kill_processors(self.init_processor_list)
         tmp_logger.debug('done')
+
+    def start_passive_mode(self, in_q_list=None, out_q_list=None, prefetch_size=100):
+        """
+        start passive mode: only spwan mb proxies (without spawning agent and plugin threads)
+        in_q_list: list of inward queue name
+        out_q_list: list of outward queue name
+        prefetch_size: prefetch size of the message broker (can control number of un-acknowledged messages stored in the local buffer)
+        returns dict of mb proxies
+        """
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='start_passive_mode')
+        tmp_logger.debug('start')
+        # initialize
+        # self.initialize()
+        all_queue_names = list(self._queues_dict.keys())
+        if in_q_list is None:
+            in_q_list = all_queue_names
+        if out_q_list is None:
+            out_q_list = all_queue_names
+        # mb_listener_proxy instances
+        mb_listener_proxy_dict = dict()
+        for in_queue in in_q_list:
+            qconf = self._queues_dict[in_queue]
+            if not qconf.get('enable', True):
+                continue
+            sconf = self._mb_servers_dict[qconf['server']]
+            mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='listener', prefetch_size=prefetch_size)
+            mb_listener_proxy_dict[in_queue] = mb_listener_proxy
+        # mb_sender_proxy instances
+        mb_sender_proxy_dict = dict()
+        for out_queue in out_q_list:
+            qconf = self._queues_dict[out_queue]
+            if not qconf.get('enable', True):
+                continue
+            sconf = self._mb_servers_dict[qconf['server']]
+            mb_sender_proxy = get_mb_proxy(name=out_queue, sconf=sconf, qconf=qconf, mode='sender')
+            mb_sender_proxy_dict[out_queue] = mb_sender_proxy
+        # spawn message broker listener proxy connections
+        for queue_name, mb_proxy in mb_listener_proxy_dict.items():
+            mb_proxy.go()
+            tmp_logger.debug('spawned listener proxy for {0}'.format(queue_name))
+        # spawn message broker sender proxy connections
+        for queue_name, mb_proxy in mb_sender_proxy_dict.items():
+            mb_proxy.go()
+            tmp_logger.debug('spawned sender proxy for {0}'.format(queue_name))
+        tmp_logger.debug('done')
+        # return
+        return {
+                'in': mb_listener_proxy_dict,
+                'out': mb_sender_proxy_dict,
+            }
