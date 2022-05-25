@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.26 (25/5/2022)
+  * for containerization
+
 * 0.0.24 (24/6/2021)
   * added WeightedLists
 
