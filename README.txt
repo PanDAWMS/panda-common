@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.27 (26/5/2022)
+  * PANDA_BEHIND_REAL_LB
+
 * 0.0.26 (25/5/2022)
   * for containerization
 

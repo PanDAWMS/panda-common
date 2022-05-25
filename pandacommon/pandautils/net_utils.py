@@ -1,3 +1,4 @@
+import os
 import copy
 import random
 import socket
@@ -62,6 +63,9 @@ class HTTPAdapterWithRandomDnsResolver (HTTPAdapter):
 # utility function to get HTTPAdapterWithRandomDnsResolver
 def get_http_adapter_with_random_dns_resolution():
     session = requests.Session()
+    # no randomization if panda is behind real load balancer than DNS LB
+    if 'PANDA_BEHIND_REAL_LB' in os.environ:
+        return session
     adapter = HTTPAdapterWithRandomDnsResolver(max_retries=0)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
