@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.28 (27/5/2022)
+  * install_itgf_ca
+
 * 0.0.27 (26/5/2022)
   * PANDA_BEHIND_REAL_LB
 

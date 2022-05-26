@@ -1,2 +1,2 @@
-include *.txt *.py *.cfg
+include *.txt *.py *.cfg tools/*
 recursive-include templates *.template

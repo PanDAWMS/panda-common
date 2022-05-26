@@ -1,0 +1,15 @@
+#!/bin/bash
+
+TMPDIR=`mktemp -d`
+cd $TMPDIR
+
+wget -l1 -r -np -nH --cut-dirs=7 http://repository.egi.eu/sw/production/cas/1/current/tgz/
+
+for tgz in $(ls *.tar.gz);
+do
+    tar xzf ./$tgz --strip-components=1 \
+      -C /etc/grid-security/certificates
+done
+
+cd -
+rm -rf $TMPDIR

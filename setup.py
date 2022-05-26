@@ -46,6 +46,9 @@ setup(
                  ['templates/panda_common.cfg.rpmnew']
                  ),
                 ],
+    scripts=[
+        'tools/panda_common-install_igtf_ca'
+    ],
     cmdclass={
         'install': install_panda,
     }
