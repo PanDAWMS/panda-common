@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.29 (27/6/2022)
+  * env vars in msg config json
+
 * 0.0.28 (27/5/2022)
   * install_itgf_ca
 
