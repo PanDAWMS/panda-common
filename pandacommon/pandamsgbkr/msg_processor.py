@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import socket
 import json
@@ -22,16 +23,36 @@ def get_mb_proxy(name, sconf, qconf, mode='listener', **kwargs):
     the_class = MBListenerProxy
     if mode == 'sender':
         the_class = MBSenderProxy
+    # resolve env variables if any
+    host_port_list = sconf['host_port_list']
+    if host_port_list:
+        new_list = []
+        for host_port in host_port_list:
+            m = re.search(r'^\${(\w+)\}$', host_port)
+            if m and m.group(1) in os.environ:
+                host_port = os.environ[m.group(1)]
+            new_list += host_port.split(',')
+        host_port_list = new_list
+    username = sconf.get('username')
+    if username:
+        m = re.search(r'^\${(\w+)\}$', username)
+        if m and m.group(1) in os.environ:
+            username = os.environ[m.group(1)]
+    passcode = sconf.get('passcode')
+    if passcode:
+        m = re.search(r'^\${(\w+)\}$', passcode)
+        if m and m.group(1) in os.environ:
+            passcode = os.environ[m.group(1)]
     # instantiate
     mb_proxy = the_class(
                             name=name,
-                            host_port_list=sconf['host_port_list'],
+                            host_port_list=host_port_list,
                             destination=qconf['destination'],
                             use_ssl=sconf.get('use_ssl', False),
                             cert_file=sconf.get('cert_file'),
                             key_file=sconf.get('key_file'),
-                            username=sconf.get('username'),
-                            passcode=sconf.get('passcode'),
+                            username=username,
+                            passcode=passcode,
                             vhost=sconf.get('vhost'),
                             wait=True,
                             verbose=sconf.get('verbose', False),
@@ -516,6 +537,8 @@ class MsgProcAgentBase(GenericThread):
         # mb_listener_proxy instances
         mb_listener_proxy_dict = dict()
         for in_queue in in_q_list:
+            if in_queue not in self._queues_dict:
+                continue
             qconf = self._queues_dict[in_queue]
             if not qconf.get('enable', True):
                 continue
@@ -525,6 +548,8 @@ class MsgProcAgentBase(GenericThread):
         # mb_sender_proxy instances
         mb_sender_proxy_dict = dict()
         for out_queue in out_q_list:
+            if out_queue not in self._queues_dict:
+                continue
             qconf = self._queues_dict[out_queue]
             if not qconf.get('enable', True):
                 continue
