@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.31 (11/7/2022)
+  * added expand_values
+
 * 0.0.30 (1/7/2022)
   * added message removal functions to MBSenderProxy
 

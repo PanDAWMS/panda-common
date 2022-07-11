@@ -16,6 +16,7 @@
 #
 
 import os
+import re
 
 try:
     from urllib.request import urlopen
@@ -68,3 +69,24 @@ class LiveConfigParser(ConfigParser):
             ConfigParser.read_file(self, res)
         # read
         ConfigParser.read(self, confFiles)
+
+
+# expand values
+def expand_values(target, values_dict):
+    for tmpKey in values_dict:
+        tmpVal = values_dict[tmpKey]
+        # env variable
+        m = re.search(r'^\$\{*(\w+)\}*$', tmpVal)
+        if m and m.group(1) in os.environ:
+            tmpVal = os.environ[m.group(1)]
+        # convert string to bool/int
+        if tmpVal == 'True':
+            tmpVal = True
+        elif tmpVal == 'False':
+            tmpVal = False
+        elif tmpVal == 'None':
+            tmpVal = None
+        elif isinstance(tmpVal, str) and re.match('^\d+$', tmpVal):
+            tmpVal = int(tmpVal)
+        # update dict
+        target.__dict__[tmpKey] = tmpVal
