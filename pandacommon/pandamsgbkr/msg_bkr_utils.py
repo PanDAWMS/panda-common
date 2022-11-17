@@ -51,7 +51,8 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
         conn_id = host_port
         if conn_id not in conn_dict:
             try:
-                conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost)
+                conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost,
+                                          keepalive=True, heartbeats=(60000, 60000))    # heartbeat every 60 seconds
                 if use_ssl:
                     ssl_opts = {
                                 'ssl_version' : ssl.PROTOCOL_TLSv1,
@@ -67,7 +68,8 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
                             'ssl_cert_file' : cert_file,
                             'ssl_key_file'  : key_file
                             }
-                conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost, **ssl_opts)
+                conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost,
+                                          keepalive=True, heartbeats=(60000, 60000), **ssl_opts)
             conn_dict[conn_id] = conn
     tmp_logger.debug('got {0} connections to {1}'.format(len(conn_dict), ' , '.join(conn_dict.keys())))
     return conn_dict
