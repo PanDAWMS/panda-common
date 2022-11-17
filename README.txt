@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.32 (17/11/2022)
+  * heartbeat in stomp connection
+  
 * 0.0.31 (11/7/2022)
   * added expand_values
 
