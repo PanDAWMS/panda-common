@@ -93,7 +93,7 @@ class SimpleMsgProcPluginBase(object):
         """
         get generic pid, including hostname, os process id, thread id
         """
-        return GenericThread().get_pid()
+        return GenericThread().get_pid(current=True)
 
 
 # muti-message processor plugin Base
@@ -306,6 +306,7 @@ class MsgProcAgentBase(GenericThread):
             plugin = plugin_factory.get_plugin(pconf)
             # fill in thread attribute dict
             processor_attr_map[proc] = dict()
+            processor_attr_map[proc]['n_threads'] = pconf.get('n_threads', 1)
             processor_attr_map[proc]['in_queue'] = in_queue
             processor_attr_map[proc]['out_queue'] = out_queue
             processor_attr_map[proc]['plugin'] = plugin
@@ -338,7 +339,7 @@ class MsgProcAgentBase(GenericThread):
         # fill processor list
         self.init_processor_list = []
         for processor_name, attr_dict in processor_attr_map.items():
-            n_threads = attr_dict.get('n_threads', 1)
+            n_threads = attr_dict['n_threads']
             for j in range(n_threads):
                 processor_id = (processor_name, j)
                 self.init_processor_list.append(processor_id)

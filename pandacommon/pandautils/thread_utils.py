@@ -13,11 +13,16 @@ class GenericThread(threading.Thread):
         self.hostname = socket.gethostname()
         self.os_pid = os.getpid()
 
-    def get_pid(self):
+    def get_pid(self, current=False):
         """
         get host/process/thread identifier
         """
-        thread_id = self.ident if self.ident else 0
+        if current:
+            thread_id = threading.get_ident()
+            if not thread_id:
+                thread_id = 0
+        else:
+            thread_id = self.ident if self.ident else 0
         return '{0}_{1}-{2}'.format(self.hostname, self.os_pid, format(thread_id, 'x'))
 
 
