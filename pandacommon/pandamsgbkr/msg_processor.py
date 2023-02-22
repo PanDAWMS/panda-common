@@ -55,6 +55,8 @@ def get_mb_proxy(name, sconf, qconf, mode='listener', **kwargs):
                             passcode=passcode,
                             vhost=sconf.get('vhost'),
                             wait=True,
+                            max_buffer_len=qconf.get('max_buffer_len', 999),
+                            buffer_block_sec=qconf.get('buffer_block_sec', 10),
                             verbose=sconf.get('verbose', False),
                             **kwargs
                         )
