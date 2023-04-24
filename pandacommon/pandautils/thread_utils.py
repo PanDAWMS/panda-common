@@ -109,3 +109,42 @@ class WeightedLists(object):
             self.weights.put(weights)
             self.data.put(data)
             return d
+
+
+# lock pool
+class LockPool(object):
+
+    def __init__(self, pool_size=100):
+        self.pool_size = pool_size
+        self.lock = multiprocessing.Lock()
+        self.manager = multiprocessing.Manager()
+        self.key_to_lock = self.manager.dict()
+        self.lock_ref_count = self.manager.dict()
+        self.lock_pool = {i: multiprocessing.Lock() for i in range(pool_size)}
+
+    def get(self, key):
+        with self.lock:
+            if key not in self.key_to_lock:
+                in_used = set(self.key_to_lock.values())
+                free_locks = set(range(self.pool_size)).difference(in_used)
+                if not free_locks:
+                    return None
+                index = free_locks.pop()
+                self.key_to_lock[key] = index
+                self.lock_ref_count[index] = 1
+            else:
+                index = self.key_to_lock[key]
+                self.lock_ref_count[index] += 1
+            return self.lock_pool[index]
+
+    def release(self, key):
+        with self.lock:
+            if key not in self.key_to_lock:
+                return
+            index = self.key_to_lock[key]
+            count = self.lock_ref_count[index]
+            count -= 1
+            if count <= 0:
+                count = 0
+                del self.key_to_lock[key]
+            self.lock_ref_count[index] = count

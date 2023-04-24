@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.34 (24/4/2023)
+  * added LockPool
+
 * 0.0.32 (17/11/2022)
   * heartbeat in stomp connection
   
