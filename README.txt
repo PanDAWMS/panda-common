@@ -7,8 +7,8 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
-* 0.0.35 (18/5/2023)
-  * upport listener blocking, configurable max_buffer_len and ack_mode
+* 0.0.36 (19/5/2023)
+  * support listener blocking, configurable max_buffer_len and ack_mode
   
 * 0.0.34 (24/4/2023)
   * added LockPool
