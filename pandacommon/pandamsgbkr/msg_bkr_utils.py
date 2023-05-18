@@ -202,7 +202,7 @@ class MsgListener(stomp.ConnectionListener):
 
     def on_error(self, *args):
         cmd, headers, body = self._parse_args(args)
-        self.logger.error('on_error : {h} | {b}'.format(h=headers, b=body))
+        self.logger.error('on_error from {c}: {h} | {b}'.format(c=self.conn_id, h=headers, b=body))
 
     def on_disconnected(self):
         self.logger.info('on_disconnected start')
@@ -232,7 +232,7 @@ class MBListenerProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False, conn_mode='all',
-                    prefetch_size=None, verbose=False, **kwargs):
+                    prefetch_size=None, max_buffer_len=999, buffer_block_sec=10, verbose=False, **kwargs):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBListenerProxy')
         # name of message queue
@@ -256,6 +256,10 @@ class MBListenerProxy(object):
         self.ack_mode = ack_mode
         # associate message buffer
         self.msg_buffer = MsgBuffer(queue_name=self.name)
+        # max length before blocking put to buffer
+        self.max_buffer_len = max_buffer_len
+        # put retry period in seconds to wait for blocking
+        self.buffer_block_sec = buffer_block_sec
         # connection mode; "all" or "any"
         self.conn_mode = conn_mode
         # connection dict
@@ -350,9 +354,19 @@ class MBListenerProxy(object):
             self.dump_msgs.append(msg_obj.data)
             self._ack(msg_obj.conn_id, msg_obj.msg_id, msg_obj.ack_id)
         else:
+            to_block = True
+            while to_block:
+                n_buffered_msg = self.msg_buffer.size()
+                if n_buffered_msg >= self.max_buffer_len:
+                    if self.verbose:
+                        self.logger.debug('_on_message too many buffered messages ({nbm}); waiting...'.format(nbm=n_buffered_msg))
+                    time.sleep(self.buffer_block_sec)
+                else:
+                    to_block = False
             self.msg_buffer.put(msg_obj)
             if self.verbose:
-                self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
+                n_buffered_msg = self.msg_buffer.size()
+                self.logger.debug('_on_message put into buffer ({nbm}): {h}'.format(nbm=n_buffered_msg, h=headers))
 
     def _on_disconnected(self, conn_id):
         self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
