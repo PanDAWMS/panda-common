@@ -382,7 +382,7 @@ class MBListenerProxy(object):
                     self.got_disconnected = False
                     conn.set_listener(listener.__class__.__name__, listener)
                     conn.connect(**self.connect_params)
-                    conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual',
+                    conn.subscribe(destination=self.destination, id=self.sub_id, ack=self.ack_mode,
                                     headers=self.subscription_headers)
                     self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
                 else:
