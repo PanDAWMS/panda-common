@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "panda-common"
+dynamic = ["version"]
+description = " PanDA Common Package"
+readme = "../README.txt"
+license = "Apache-2.0"
+authors = [
+    { name = "Panda Team", email = "atlas-adc-panda@cern.ch" },
+]
+dependencies = [
+    "configparser",
+    "pytz",
+    "requests",
+    "stomp.py >=4.1.23, <=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://panda-wms.readthedocs.io/en/latest/"
+
+[tool.hatch.version]
+path = "../PandaPkgInfo.py"
+pattern = "release_version = \"(?P<version>[^\"]+)\""
+
+[tool.hatch.build]
+directory = "../dist"
+sources = ["src"]
+
+[tool.hatch.build.force-include]
+"../" = "src"
+
+[tool.hatch.build.targets.wheel]
+exclude = ["*.template"]
+packages = ["pandacommon"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"templates/panda_common.cfg.rpmnew" = "etc/panda/panda_common.cfg.rpmnew"
+"tools/panda_common-install_igtf_ca" = "bin/panda_common-install_igtf_ca"
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
+
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.github",
+]
