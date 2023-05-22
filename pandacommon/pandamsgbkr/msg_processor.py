@@ -58,6 +58,7 @@ def get_mb_proxy(name, sconf, qconf, mode='listener', **kwargs):
                             ack_mode=qconf.get('ack_mode', 'client-individual'),
                             max_buffer_len=qconf.get('max_buffer_len', 999),
                             buffer_block_sec=qconf.get('buffer_block_sec', 10),
+                            use_transaction=qconf.get('use_transaction', True),
                             verbose=sconf.get('verbose', False),
                             **kwargs
                         )

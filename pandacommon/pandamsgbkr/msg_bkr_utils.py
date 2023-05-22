@@ -232,7 +232,7 @@ class MBListenerProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False, conn_mode='all',
-                    prefetch_size=None, max_buffer_len=999, buffer_block_sec=10, verbose=False, **kwargs):
+                    prefetch_size=None, max_buffer_len=999, buffer_block_sec=10, use_transaction=True, verbose=False, **kwargs):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBListenerProxy')
         # name of message queue
@@ -260,6 +260,8 @@ class MBListenerProxy(object):
         self.max_buffer_len = max_buffer_len
         # put retry period in seconds to wait for blocking
         self.buffer_block_sec = buffer_block_sec
+        # whether to enable trancastion of message broker to wrap the message processing
+        self.use_transaction = use_transaction
         # connection mode; "all" or "any"
         self.conn_mode = conn_mode
         # connection dict
@@ -345,7 +347,7 @@ class MBListenerProxy(object):
             self.logger.warning('{conid} {mid} {ackid} NACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
     def _on_message(self, headers, body, conn_id):
-        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=body)
+        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=body, is_transacted=self.use_transaction)
         if self.verbose:
             self.logger.debug('_on_message from {c} made message object: {h}'.format(c=conn_id, h=headers))
         if self.skip_buffer:
