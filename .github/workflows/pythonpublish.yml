@@ -20,7 +20,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install hatch
     - name: Build package
-      run: hatch build -t sdist
+      run: |
+        cd package
+        hatch build -t sdist
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
