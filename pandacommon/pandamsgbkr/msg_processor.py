@@ -75,9 +75,13 @@ class SimpleMsgProcPluginBase(object):
         - one-in-one-out: to receive messages from one queue, proceess the messages to create new messages, and then and send new messages to another queue
     """
 
-    def __init__(self):
-        # Do NOT change here
-        pass
+    def __init__(self, **params):
+        """
+        Low level initialization called by plugin factory
+        The dict of params configured is passed to self.params
+        Do NOT overwrite __init__ for intitialization. Instead, overwrite initialize(self) function
+        """
+        self.params = params
 
     def initialize(self):
         """
