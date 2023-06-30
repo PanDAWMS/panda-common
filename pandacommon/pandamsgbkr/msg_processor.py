@@ -89,6 +89,12 @@ class SimpleMsgProcPluginBase(object):
         """
         pass
 
+    def terminate(self):
+        """
+        terminate plugin instance, run before stopping the thread
+        """
+        pass
+
     def process(self, msg_obj):
         """
         process the message
@@ -189,6 +195,9 @@ class SimpleMsgProcThread(GenericThread):
         # stop loop
         self.logger.info('stopped loop')
         # tear down
+        # terminate plugin
+        self.logger.info('plugin terminate')
+        self.plugin.terminate()
         self.logger.info('stopped run')
 
     def stop(self):
