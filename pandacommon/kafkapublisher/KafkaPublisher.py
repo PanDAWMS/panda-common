@@ -14,8 +14,6 @@ from ..commonconfig import common_config
 
 class KafkaPublisher:
     def __init__(self):
-        tmpConf = LiveConfigParser()
-        tmpConf.read('panda_common.cfg')
         config = common_config.get('kafka')
 
         self.producer = Producer({
