@@ -8,7 +8,7 @@ import json
 import hashlib
 from confluent_kafka import Producer
 from pandacommon.pandalogger.logger_utils import logger_utils
-import config
+import kafka_config as config
 
 class KafkaPublisher:
     def __init__(self):
