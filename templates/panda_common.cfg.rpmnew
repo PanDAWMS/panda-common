@@ -41,3 +41,13 @@ rotating_max_size=1024
 # Ratation interval in hour.
 # Effective only when rotating_policy=time
 rotating_interval=24
+
+[kafka]
+# Kafka related environmental variables as required by CERN IT https://gitlab.cern.ch/db/kafka-clients-example/-/blob/master/python/confluent-kafka-python/kerberos/config.py
+basedir=FIXME # location of basedir, for example: ./
+kafka_cluster=FIXME  # For example: kafka-gp
+topic=bigpanda_mon # Topic in the KAFKA_CLUSTER
+principal=FIXME@CERN." # For example: MYUSERNAME@CERN.CH
+group_id=FIXME # For example: "python-client-example-" + TOPIC
+keytab=FIXME # For example: BASEDIR + ".keytab"
+cacerts=/etc/pki/tls/certs/

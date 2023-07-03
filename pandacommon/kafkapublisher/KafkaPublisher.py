@@ -6,14 +6,20 @@
 
 import json
 import hashlib
+import socket
+import sys
 from confluent_kafka import Producer
 from pandacommon.pandalogger import logger_utils
-from . import kafka_config as config
+from pandacommon.liveconfigparser.LiveConfigParser import LiveConfigParser
 
 class KafkaPublisher:
     def __init__(self):
+        tmpConf = LiveConfigParser()
+        tmpConf.read('panda_common.cfg')
+        config = tmpConf.kafka
+
         self.producer = Producer({
-                'bootstrap.servers': config.BOOTSTRAP_SERVERS,
+                'bootstrap.servers': get_bootstrap_servers(),
                 'group.id': config.GROUP_ID,
                 'ssl.ca.location': config.CACERTS,
                 'security.protocol': 'SASL_SSL',
@@ -25,6 +31,13 @@ class KafkaPublisher:
         })
         self.logger = logger_utils.setup_logger()
 
+    def get_bootstrap_servers():
+        KAFKA_CLUSTER = "kafka-gp"
+        return ",".join(
+            map(lambda x: x + ":9093",
+                sorted([(socket.gethostbyaddr(i))[0] for i in (socket.gethostbyname_ex(KAFKA_CLUSTER + ".cern.ch"))[2]])
+                )
+        )
     def publish_message(self, topic, payload):
         # Convert payload to JSON string
         message = json.dumps(payload)
