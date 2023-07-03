@@ -1,7 +1,7 @@
 BASEDIR = "/opt/python/kafka-clients-example/python/confluent-kafka-python/kerberos/"
 KAFKA_CLUSTER = "FIXME"
 TOPIC = "bigpanda_mon"
-PRINCIPAL = "FIXME"
+PRINCIPAL = "FIXME@CERN.CH"
 GROUP_ID = "python-client-example-" + TOPIC
 KEYTAB = BASEDIR + ".keytab"
 CACERTS = "/etc/pki/tls/certs/"
