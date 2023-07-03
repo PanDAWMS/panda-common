@@ -10,13 +10,13 @@ import socket
 import sys
 from confluent_kafka import Producer
 from pandacommon.pandalogger import logger_utils
-from pandacommon.liveconfigparser.LiveConfigParser import LiveConfigParser
+from ..commonconfig import common_config
 
 class KafkaPublisher:
     def __init__(self):
         tmpConf = LiveConfigParser()
         tmpConf.read('panda_common.cfg')
-        config = tmpConf.kafka
+        config = common_config.get('kafka')
 
         self.producer = Producer({
                 'bootstrap.servers': get_bootstrap_servers(),
