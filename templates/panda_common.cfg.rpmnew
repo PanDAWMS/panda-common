@@ -46,6 +46,7 @@ rotating_interval=24
 # Kafka related environmental variables as required by CERN IT https://gitlab.cern.ch/db/kafka-clients-example/-/blob/master/python/confluent-kafka-python/kerberos/config.py
 basedir=FIXME # location of basedir, for example: ./
 kafka_cluster=FIXME  # For example: kafka-gp
+kafka_cluster_domain=FIXME  # For example: .cern.ch
 topic=bigpanda_mon # Topic in the KAFKA_CLUSTER
 principal=FIXME@CERN.CH # For example: ekaravak@CERN.CH
 group_id=FIXME # For example: "python-client-example-" + TOPIC

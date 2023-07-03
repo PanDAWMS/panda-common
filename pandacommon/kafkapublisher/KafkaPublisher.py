@@ -15,7 +15,7 @@ class KafkaPublisher:
     def __init__(self):
         kafka_config = common_config.get('kafka')
         self.producer = Producer({
-                'bootstrap.servers': self.get_bootstrap_servers(kafka_config['kafka_cluster']),
+                'bootstrap.servers': self.get_bootstrap_servers(kafka_config['kafka_cluster'], kafka_config['kafka_cluster_domain']),
                 'group.id': kafka_config['group_id'],
                 'ssl.ca.location': kafka_config['cacerts'],
                 'security.protocol': 'SASL_SSL',
@@ -27,10 +27,10 @@ class KafkaPublisher:
         })
         self.logger = logger_utils.setup_logger()
 
-    def get_bootstrap_servers(self, cluster):
+    def get_bootstrap_servers(self, cluster, domain):
         return ",".join(
             map(lambda x: x + ":9093",
-                sorted([(socket.gethostbyaddr(i))[0] for i in (socket.gethostbyname_ex(cluster + ".cern.ch"))[2]])
+                sorted([(socket.gethostbyaddr(i))[0] for i in (socket.gethostbyname_ex(cluster + domain))[2]])
                 )
         )
 
