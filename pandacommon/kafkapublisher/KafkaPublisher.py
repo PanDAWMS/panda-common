@@ -7,35 +7,33 @@
 import json
 import hashlib
 import socket
-import sys
 from confluent_kafka import Producer
 from pandacommon.pandalogger import logger_utils
-from ..commonconfig import common_config
+from pandacommon.commonconfig import common_config
 
 class KafkaPublisher:
     def __init__(self):
-        config = common_config.get('kafka')
-
+        kafka_config = common_config.get('kafka')
         self.producer = Producer({
-                'bootstrap.servers': get_bootstrap_servers(),
-                'group.id': config.GROUP_ID,
-                'ssl.ca.location': config.CACERTS,
+                'bootstrap.servers': self.get_bootstrap_servers(kafka_config['kafka_cluster']),
+                'group.id': kafka_config['group_id'],
+                'ssl.ca.location': kafka_config['cacerts'],
                 'security.protocol': 'SASL_SSL',
-                'sasl.kerberos.keytab': config.KEYTAB,
+                'sasl.kerberos.keytab': kafka_config['keytab'],
                 'auto.offset.reset': 'latest',
                 'enable.auto.offset.store': True,
-                'sasl.kerberos.principal': config.PRINCIPAL,
+                'sasl.kerberos.principal': kafka_config['principal'],
                 'log_level': 0
         })
         self.logger = logger_utils.setup_logger()
 
-    def get_bootstrap_servers():
-        KAFKA_CLUSTER = "kafka-gp"
+    def get_bootstrap_servers(self, cluster):
         return ",".join(
             map(lambda x: x + ":9093",
-                sorted([(socket.gethostbyaddr(i))[0] for i in (socket.gethostbyname_ex(KAFKA_CLUSTER + ".cern.ch"))[2]])
+                sorted([(socket.gethostbyaddr(i))[0] for i in (socket.gethostbyname_ex(cluster + ".cern.ch"))[2]])
                 )
         )
+
     def publish_message(self, topic, payload):
         # Convert payload to JSON string
         message = json.dumps(payload)
