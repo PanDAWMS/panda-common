@@ -75,13 +75,23 @@ class SimpleMsgProcPluginBase(object):
         - one-in-one-out: to receive messages from one queue, proceess the messages to create new messages, and then and send new messages to another queue
     """
 
-    def __init__(self):
-        # Do NOT change here
-        pass
+    def __init__(self, **params):
+        """
+        Low level initialization called by plugin factory
+        The dict of params configured is passed to self.params
+        Do NOT overwrite __init__ for intitialization. Instead, overwrite initialize(self) function
+        """
+        self.params = params
 
     def initialize(self):
         """
         initialize plugin instance, run once before loop in thread
+        """
+        pass
+
+    def terminate(self):
+        """
+        terminate plugin instance, run before stopping the thread
         """
         pass
 
@@ -185,6 +195,9 @@ class SimpleMsgProcThread(GenericThread):
         # stop loop
         self.logger.info('stopped loop')
         # tear down
+        # terminate plugin
+        self.logger.info('plugin terminate')
+        self.plugin.terminate()
         self.logger.info('stopped run')
 
     def stop(self):
