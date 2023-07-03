@@ -23,6 +23,7 @@ class PluginFactory(object):
         # use module + class as key
         moduleName = plugin_conf['module']
         className = plugin_conf['name']
+        pluginParams = plugin_conf.get('params', {})
         if moduleName is None or className is None:
             tmpLog.warning('Invalid plugin; either module or name is missing '.format(moduleName))
             return None
@@ -45,7 +46,7 @@ class PluginFactory(object):
                 tmpLog.debug('class {0} already loaded. Skipped'.format(pluginKey))
         # instantiate
         cls = self.classMap[pluginKey]
-        inst = cls()
+        inst = cls(**pluginParams)
         for tmpKey, tmpVal in plugin_conf.items():
             if tmpKey in ['module', 'name']:
                 continue
