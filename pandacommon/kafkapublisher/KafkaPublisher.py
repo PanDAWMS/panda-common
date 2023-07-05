@@ -16,12 +16,12 @@ class KafkaPublisher:
         kafka_config = common_config.get('kafka')
         self.producer = Producer({
                 'bootstrap.servers': self.get_bootstrap_servers(kafka_config['kafka_cluster'], kafka_config['kafka_cluster_domain']),
-                'group.id': kafka_config['group_id'],
+                #'group.id': kafka_config['group_id'],
                 'ssl.ca.location': kafka_config['cacerts'],
                 'security.protocol': 'SASL_SSL',
                 'sasl.kerberos.keytab': kafka_config['keytab'],
-                'auto.offset.reset': 'latest',
-                'enable.auto.offset.store': True,
+                #'auto.offset.reset': 'latest',
+                #'enable.auto.offset.store': True,
                 'sasl.kerberos.principal': kafka_config['principal'],
                 'log_level': 0
         })
