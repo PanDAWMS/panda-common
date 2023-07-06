@@ -16,15 +16,13 @@ class KafkaPublisher:
         kafka_config = common_config.get('kafka')
         self.producer = Producer({
                 'bootstrap.servers': self.get_bootstrap_servers(kafka_config['kafka_cluster'], kafka_config['kafka_cluster_domain']),
-                #'group.id': kafka_config['group_id'],
                 'ssl.ca.location': kafka_config['cacerts'],
                 'security.protocol': 'SASL_SSL',
                 'sasl.kerberos.keytab': kafka_config['keytab'],
-                #'auto.offset.reset': 'latest',
-                #'enable.auto.offset.store': True,
                 'sasl.kerberos.principal': kafka_config['principal'],
                 'log_level': 0
         })
+        self.topic = kafka_config['topic']
         self.logger = logger_utils.setup_logger()
 
     def get_bootstrap_servers(self, cluster, domain):
@@ -34,7 +32,7 @@ class KafkaPublisher:
                 )
         )
 
-    def publish_message(self, topic, payload):
+    def publish_message(self, payload, topic=None):
         # Convert payload to JSON string
         message = json.dumps(payload)
 
@@ -44,6 +42,10 @@ class KafkaPublisher:
 
         # Add hashed payload as 'message_id'
         payload['message_id'] = hashed_payload
+
+        # If no topic was passed, then use the one specified in panda_common.cfg
+        if topic == None:
+            topic = self.topic
 
         # Produce message asynchronously
         self.producer.produce(topic, value=json.dumps(payload), callback=self._delivery_report)
