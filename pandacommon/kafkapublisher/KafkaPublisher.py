@@ -44,7 +44,7 @@ class KafkaPublisher:
         payload['message_id'] = hashed_payload
 
         # If no topic was passed, then use the one specified in panda_common.cfg
-        if topic == None:
+        if topic is None:
             topic = self.topic
 
         # Produce message asynchronously
