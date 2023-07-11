@@ -508,9 +508,18 @@ class MBSenderProxy(object):
         """
         send a message to queue
         """
-        self.conn.send(destination=self.destination, body=data, headers=headers)
-        if self.verbose:
-            self.logger.debug('send to {dest} | {data}'.format(dest=self.destination, data=data))
+        if data is None:
+            self.logger.debug('got None, not to send')
+        else:
+            try:
+                self.conn.send(destination=self.destination, body=data, headers=headers)
+            except Exception as e:
+                tb_str = traceback.format_exc()
+                self.logger.error('failed to send message to {0} ; data={1} ; {2} \n{3}'.format(
+                                self.destination, data, e.__class__.__name__, tb_str))
+            else:
+                if self.verbose:
+                    self.logger.debug('send to {dest} | {data}'.format(dest=self.destination, data=data))
 
     def waste(self, duration=3):
         """
