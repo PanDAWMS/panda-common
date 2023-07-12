@@ -1,3 +1,4 @@
+import os
 import datetime
 import threading
 import socket
@@ -74,6 +75,16 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
             conn_dict[conn_id] = conn
     tmp_logger.debug('got {0} connections to {1}'.format(len(conn_dict), ' , '.join(conn_dict.keys())))
     return conn_dict
+
+# get fqdn pid
+def get_fqdn_pid():
+    """
+    Get string containing FQDN and pid
+    """
+    fqdn = socket.getfqdn()
+    os_pid = os.getpid()
+    return f'{fqdn}_{os_pid}'
+
 
 
 # message buffer
@@ -247,8 +258,13 @@ class MBListenerProxy(object):
         self.vhost = vhost
         # destination queue to subscribe
         self.destination = destination
+        # randomness
+        fqdn_pid = get_fqdn_pid()
+        tmp_timestamp_str = str(time.time())
+        random.seed(f'{fqdn_pid}:{tmp_timestamp_str}')
+        n_rand = random.randrange(10**6)
         # subscription ID
-        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
+        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(fqdn_pid, n_rand)
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
@@ -459,8 +475,13 @@ class MBSenderProxy(object):
         self.vhost = vhost
         # destination queue to subscribe
         self.destination = destination
+        # randomness
+        fqdn_pid = get_fqdn_pid()
+        tmp_timestamp_str = str(time.time())
+        random.seed(f'{fqdn_pid}:{tmp_timestamp_str}')
+        n_rand = random.randrange(10**6)
         # subscription ID
-        self.sub_id = 'panda-MBSenderProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
+        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(fqdn_pid, n_rand)
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
