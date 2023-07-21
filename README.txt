@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.39 (21/7/2023)
+  * to ignore robot.txt when getting CA certs
+
 * 0.0.36 (19/5/2023)
   * support listener blocking, configurable max_buffer_len and ack_mode
   
