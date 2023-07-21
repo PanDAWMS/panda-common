@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.41 (21/7/2023)
+  * to avoid relative import
+
 * 0.0.40 (21/7/2023)
   * to ignore robot.txt when getting CA certs
 
