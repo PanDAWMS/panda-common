@@ -371,7 +371,7 @@ class MBListenerProxy(object):
             self.logger.warning('{conid} {mid} {ackid} NACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
     def _on_message(self, headers, body, conn_id):
-        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=body, is_transacted=self.use_transaction)
+        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers.get('ack'), data=body, is_transacted=self.use_transaction)
         if self.verbose:
             self.logger.debug('_on_message from {c} made message object: {h}'.format(c=conn_id, h=headers))
         if self.skip_buffer:
