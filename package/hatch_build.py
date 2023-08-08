@@ -10,7 +10,7 @@ class CustomBuildHook(BuildHookInterface):
         # chmod +x
         for f in glob.glob("./tools/*"):
             st = os.stat(f)
-            os.chmod(f, st.st_mode | stat.S_IEXEC)
+            os.chmod(f, st.st_mode | stat.S_IEXEC | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def finalize(self, version, build_data, artifact_path):
         pass
