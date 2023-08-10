@@ -13,9 +13,9 @@ class GenericThread(threading.Thread):
         self.hostname = socket.gethostname()
         self.os_pid = os.getpid()
 
-    def get_pid(self, current=False):
+    def get_thread_id(self, current=False):
         """
-        get host/process/thread identifier
+        get thread identifier
         """
         if current:
             thread_id = threading.get_ident()
@@ -23,7 +23,30 @@ class GenericThread(threading.Thread):
                 thread_id = 0
         else:
             thread_id = self.ident if self.ident else 0
+
+        return thread_id
+
+    def get_pid(self, current=False):
+        """
+        get host/process/thread identifier
+        """
+        thread_id = self.get_thread_id(current)
         return '{0}_{1}-{2}'.format(self.hostname, self.os_pid, format(thread_id, 'x'))
+
+    def get_full_id(self, file_name, module_name):
+        """
+        combines the host/process/thread identifier with the module information
+        """
+
+        host_id = self.hostname
+        process_id = self.os_pid
+        thread_id = self.get_thread_id()
+
+        file_basename = os.path.basename(file_name)  # remove the path for better readability
+        full_id = "host={0} filename={1} module={2} process={3} thread={4}".format(host_id, file_basename, module_name,
+                                                                                   process_id, thread_id)
+
+        return full_id
 
 
 # map with lock
