@@ -3,7 +3,7 @@
 TMPDIR=`mktemp -d`
 cd $TMPDIR
 
-wget -l1 -r -np -nH --cut-dirs=7 http://repository.egi.eu/sw/production/cas/1/current/tgz/
+wget -l1 -r -np -nH -e robots=off --cut-dirs=7 http://repository.egi.eu/sw/production/cas/1/current/tgz/
 
 for tgz in $(ls *.tar.gz);
 do

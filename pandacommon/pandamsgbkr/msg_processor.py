@@ -55,6 +55,10 @@ def get_mb_proxy(name, sconf, qconf, mode='listener', **kwargs):
                             passcode=passcode,
                             vhost=sconf.get('vhost'),
                             wait=True,
+                            ack_mode=qconf.get('ack_mode', 'client-individual'),
+                            max_buffer_len=qconf.get('max_buffer_len', 999),
+                            buffer_block_sec=qconf.get('buffer_block_sec', 10),
+                            use_transaction=qconf.get('use_transaction', True),
                             verbose=sconf.get('verbose', False),
                             **kwargs
                         )
@@ -71,13 +75,23 @@ class SimpleMsgProcPluginBase(object):
         - one-in-one-out: to receive messages from one queue, proceess the messages to create new messages, and then and send new messages to another queue
     """
 
-    def __init__(self):
-        # Do NOT change here
-        pass
+    def __init__(self, **params):
+        """
+        Low level initialization called by plugin factory
+        The dict of params configured is passed to self.params
+        Do NOT overwrite __init__ for intitialization. Instead, overwrite initialize(self) function
+        """
+        self.params = params
 
     def initialize(self):
         """
         initialize plugin instance, run once before loop in thread
+        """
+        pass
+
+    def terminate(self):
+        """
+        terminate plugin instance, run before stopping the thread
         """
         pass
 
@@ -181,6 +195,9 @@ class SimpleMsgProcThread(GenericThread):
         # stop loop
         self.logger.info('stopped loop')
         # tear down
+        # terminate plugin
+        self.logger.info('plugin terminate')
+        self.plugin.terminate()
         self.logger.info('stopped run')
 
     def stop(self):

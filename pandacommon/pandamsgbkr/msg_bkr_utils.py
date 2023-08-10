@@ -1,3 +1,4 @@
+import os
 import datetime
 import threading
 import socket
@@ -30,7 +31,8 @@ _BUFFER_MAP = dict()
 
 
 # get connection dict
-def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, force=False):
+def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, force=False,
+                         keepalive=True, send_heartbeat_ms=60000, recv_heartbeat_ms=0):
     """
     get dict {conn_id: connection}
     """
@@ -52,7 +54,7 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
         if conn_id not in conn_dict:
             try:
                 conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost,
-                                          keepalive=True, heartbeats=(60000, 60000))    # heartbeat every 60 seconds
+                                          keepalive=keepalive, heartbeats=(send_heartbeat_ms, recv_heartbeat_ms))
                 if use_ssl:
                     ssl_opts = {
                                 'ssl_version' : ssl.PROTOCOL_TLSv1,
@@ -69,10 +71,20 @@ def _get_connection_dict(host_port_list, use_ssl=False, cert_file=None, key_file
                             'ssl_key_file'  : key_file
                             }
                 conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost,
-                                          keepalive=True, heartbeats=(60000, 60000), **ssl_opts)
+                                          keepalive=keepalive, heartbeats=(send_heartbeat_ms, recv_heartbeat_ms), **ssl_opts)
             conn_dict[conn_id] = conn
     tmp_logger.debug('got {0} connections to {1}'.format(len(conn_dict), ' , '.join(conn_dict.keys())))
     return conn_dict
+
+# get fqdn pid
+def get_fqdn_pid():
+    """
+    Get string containing FQDN and pid
+    """
+    fqdn = socket.getfqdn()
+    os_pid = os.getpid()
+    return f'{fqdn}_{os_pid}'
+
 
 
 # message buffer
@@ -202,7 +214,7 @@ class MsgListener(stomp.ConnectionListener):
 
     def on_error(self, *args):
         cmd, headers, body = self._parse_args(args)
-        self.logger.error('on_error : {h} | {b}'.format(h=headers, b=body))
+        self.logger.error('on_error from {c}: {h} | {b}'.format(c=self.conn_id, h=headers, b=body))
 
     def on_disconnected(self):
         self.logger.info('on_disconnected start')
@@ -232,7 +244,8 @@ class MBListenerProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False, conn_mode='all',
-                    prefetch_size=None, verbose=False, **kwargs):
+                    prefetch_size=None, max_buffer_len=999, buffer_block_sec=10, use_transaction=True, verbose=False, 
+                    keepalive=True, send_heartbeat_ms=60000, recv_heartbeat_ms=0, **kwargs):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBListenerProxy')
         # name of message queue
@@ -245,8 +258,13 @@ class MBListenerProxy(object):
         self.vhost = vhost
         # destination queue to subscribe
         self.destination = destination
+        # randomness
+        fqdn_pid = get_fqdn_pid()
+        tmp_timestamp_str = str(time.time())
+        random.seed(f'{fqdn_pid}:{tmp_timestamp_str}')
+        n_rand = random.randrange(10**6)
         # subscription ID
-        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
+        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(fqdn_pid, n_rand)
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
@@ -256,6 +274,12 @@ class MBListenerProxy(object):
         self.ack_mode = ack_mode
         # associate message buffer
         self.msg_buffer = MsgBuffer(queue_name=self.name)
+        # max length before blocking put to buffer
+        self.max_buffer_len = max_buffer_len
+        # put retry period in seconds to wait for blocking
+        self.buffer_block_sec = buffer_block_sec
+        # whether to enable trancastion of message broker to wrap the message processing
+        self.use_transaction = use_transaction
         # connection mode; "all" or "any"
         self.conn_mode = conn_mode
         # connection dict
@@ -276,6 +300,11 @@ class MBListenerProxy(object):
         self.verbose = verbose
         # prefetch count of the MB (max number of un-acknowledge messages allowed)
         self.prefetch_size = prefetch_size
+        # whether to enable keepalive
+        self.keepalive = keepalive
+        # sending and wanting-to-receive heartbeat period in microseconds
+        self.send_heartbeat_ms = send_heartbeat_ms
+        self.recv_heartbeat_ms = recv_heartbeat_ms
         # evaluate subscription headers
         self._evaluate_subscription_headers()
         # get connections
@@ -285,7 +314,8 @@ class MBListenerProxy(object):
         """
         get connections and generate listener objects
         """
-        self.connection_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        self.connection_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost,
+                                                    keepalive=self.keepalive, send_heartbeat_ms=self.send_heartbeat_ms, recv_heartbeat_ms=self.recv_heartbeat_ms)
         self.logger.debug('start, conn_mode={0}'.format(self.conn_mode))
         if self.conn_mode == 'all':
             # for receiver, subscribe all hosts behind the same hostname
@@ -341,7 +371,7 @@ class MBListenerProxy(object):
             self.logger.warning('{conid} {mid} {ackid} NACK'.format(conid=conn_id, mid=msg_id, ackid=ack_id))
 
     def _on_message(self, headers, body, conn_id):
-        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers['ack'], data=body)
+        msg_obj = MsgObj(mb_proxy=self, conn_id=conn_id, msg_id=headers['message-id'], ack_id=headers.get('ack'), data=body, is_transacted=self.use_transaction)
         if self.verbose:
             self.logger.debug('_on_message from {c} made message object: {h}'.format(c=conn_id, h=headers))
         if self.skip_buffer:
@@ -350,9 +380,19 @@ class MBListenerProxy(object):
             self.dump_msgs.append(msg_obj.data)
             self._ack(msg_obj.conn_id, msg_obj.msg_id, msg_obj.ack_id)
         else:
+            to_block = True
+            while to_block:
+                n_buffered_msg = self.msg_buffer.size()
+                if n_buffered_msg >= self.max_buffer_len:
+                    if self.verbose:
+                        self.logger.debug('_on_message too many buffered messages ({nbm}); waiting...'.format(nbm=n_buffered_msg))
+                    time.sleep(self.buffer_block_sec)
+                else:
+                    to_block = False
             self.msg_buffer.put(msg_obj)
             if self.verbose:
-                self.logger.debug('_on_message put into buffer: {h}'.format(h=headers))
+                n_buffered_msg = self.msg_buffer.size()
+                self.logger.debug('_on_message put into buffer ({nbm}): {h}'.format(nbm=n_buffered_msg, h=headers))
 
     def _on_disconnected(self, conn_id):
         self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
@@ -368,7 +408,7 @@ class MBListenerProxy(object):
                     self.got_disconnected = False
                     conn.set_listener(listener.__class__.__name__, listener)
                     conn.connect(**self.connect_params)
-                    conn.subscribe(destination=self.destination, id=self.sub_id, ack='client-individual',
+                    conn.subscribe(destination=self.destination, id=self.sub_id, ack=self.ack_mode,
                                     headers=self.subscription_headers)
                     self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
                 else:
@@ -421,7 +461,8 @@ class MBListenerProxy(object):
 class MBSenderProxy(object):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
-                    username=None, passcode=None, wait=True, verbose=False, **kwargs):
+                    username=None, passcode=None, wait=True, verbose=False,
+                    keepalive=True, send_heartbeat_ms=60000, recv_heartbeat_ms=0, **kwargs):
         # logger
         self.logger = logger_utils.make_logger(base_logger, token=name, method_name='MBSenderProxy')
         # name of message queue
@@ -434,8 +475,13 @@ class MBSenderProxy(object):
         self.vhost = vhost
         # destination queue to subscribe
         self.destination = destination
+        # randomness
+        fqdn_pid = get_fqdn_pid()
+        tmp_timestamp_str = str(time.time())
+        random.seed(f'{fqdn_pid}:{tmp_timestamp_str}')
+        n_rand = random.randrange(10**6)
         # subscription ID
-        self.sub_id = 'panda-MBSenderProxy_{0}_r{1:06}'.format(socket.getfqdn(), random.randrange(10**6))
+        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(fqdn_pid, n_rand)
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
@@ -449,6 +495,11 @@ class MBSenderProxy(object):
         self.to_disconnect = False
         # whether to log verbosely
         self.verbose = verbose
+        # whether to enable keepalive
+        self.keepalive = keepalive
+        # sending and wanting-to-receive heartbeat period in microseconds
+        self.send_heartbeat_ms = send_heartbeat_ms
+        self.recv_heartbeat_ms = recv_heartbeat_ms
         # instance lock for removers
         self.remover_lock = threading.Lock()
         # removers
@@ -460,7 +511,8 @@ class MBSenderProxy(object):
         """
         get a connection and a listener
         """
-        conn_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost)
+        conn_dict = _get_connection_dict(self.host_port_list, self.use_ssl, self.cert_file, self.key_file, self.vhost,
+                                            keepalive=self.keepalive, send_heartbeat_ms=self.send_heartbeat_ms, recv_heartbeat_ms=self.recv_heartbeat_ms)
         self.conn_id, self.conn = random.choice(list(conn_dict.items()))
         self.listener = MsgListener(mb_proxy=self, conn_id=self.conn_id, verbose=self.verbose)
         self.logger.debug('got connection about {0}'.format(self.conn_id))
@@ -477,9 +529,18 @@ class MBSenderProxy(object):
         """
         send a message to queue
         """
-        self.conn.send(destination=self.destination, body=data, headers=headers)
-        if self.verbose:
-            self.logger.debug('send to {dest} | {data}'.format(dest=self.destination, data=data))
+        if data is None:
+            self.logger.debug('got None, not to send')
+        else:
+            try:
+                self.conn.send(destination=self.destination, body=data, headers=headers)
+            except Exception as e:
+                tb_str = traceback.format_exc()
+                self.logger.error('failed to send message to {0} ; data={1} ; {2} \n{3}'.format(
+                                self.destination, data, e.__class__.__name__, tb_str))
+            else:
+                if self.verbose:
+                    self.logger.debug('send to {dest} | {data}'.format(dest=self.destination, data=data))
 
     def waste(self, duration=3):
         """
