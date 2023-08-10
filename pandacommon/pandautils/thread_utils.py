@@ -33,7 +33,7 @@ class GenericThread(threading.Thread):
         thread_id = self.get_thread_id(current)
         return '{0}_{1}-{2}'.format(self.hostname, self.os_pid, format(thread_id, 'x'))
 
-    def get_full_id(self, file_name, module_name):
+    def get_full_id(self, module_name, file_name):
         """
         combines the host/process/thread identifier with the module information
         """
