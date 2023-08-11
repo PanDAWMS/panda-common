@@ -7,6 +7,9 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.42 (11/8/2023)
+  * updates on thread_utils.py
+
 * 0.0.41 (21/7/2023)
   * to avoid relative import
 
