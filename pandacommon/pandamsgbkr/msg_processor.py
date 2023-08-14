@@ -128,11 +128,11 @@ class SimpleMsgProcThread(GenericThread):
     Thread of simple message processor of certain plugin
     """
 
-    def __init__(self, attr_dict, sleep_time, thread_j=0):
+    def __init__(self, plugin, attr_dict, sleep_time, thread_j):
         GenericThread.__init__(self)
-        self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='SimpleMsgProcThread')
+        self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='SimpleMsgProcThread.__init__')
         self.__to_run = True
-        self.plugin = attr_dict['plugin']
+        self.plugin = plugin
         self.in_queue = attr_dict.get('in_queue')
         self.mb_sender_proxy = attr_dict.get('mb_sender_proxy')
         self.sleep_time = sleep_time
@@ -234,6 +234,7 @@ class MsgProcAgentBase(GenericThread):
         self.init_mb_sender_proxy_list = []
         self.init_processor_list = []
         self.processor_attr_map = dict()
+        self.processor_instance_map = dict()
         self.processor_thread_map = dict()
         self.passive_mb_listener_proxy_dict = dict()
         self.passive_mb_sender_proxy_dict = dict()
@@ -322,15 +323,23 @@ class MsgProcAgentBase(GenericThread):
                 in_q_set.add(in_queue)
             if out_queue:
                 out_q_set.add(out_queue)
-            # plugin
+            # n_threads of processors
+            n_threads = pconf.get('n_threads', 1)
+            # plugin: one instance for each thread
             plugin_factory = PluginFactory()
-            plugin = plugin_factory.get_plugin(pconf)
+            plugin_class_name = None
+            for thread_j in range(n_threads):
+                processor_id = (proc, thread_j)
+                plugin = plugin_factory.get_plugin(pconf)
+                self.processor_instance_map[processor_id] = plugin
+                if thread_j == 0:
+                    plugin_class_name = plugin.__class__.__name__
             # fill in thread attribute dict
             processor_attr_map[proc] = dict()
-            processor_attr_map[proc]['n_threads'] = pconf.get('n_threads', 1)
+            processor_attr_map[proc]['n_threads'] = n_threads
             processor_attr_map[proc]['in_queue'] = in_queue
             processor_attr_map[proc]['out_queue'] = out_queue
-            processor_attr_map[proc]['plugin'] = plugin
+            processor_attr_map[proc]['plugin_class_name'] = plugin_class_name
         # mb_listener_proxy instances
         mb_listener_proxy_dict = dict()
         for in_queue in in_q_set:
@@ -361,8 +370,8 @@ class MsgProcAgentBase(GenericThread):
         self.init_processor_list = []
         for processor_name, attr_dict in processor_attr_map.items():
             n_threads = attr_dict['n_threads']
-            for j in range(n_threads):
-                processor_id = (processor_name, j)
+            for thread_j in range(n_threads):
+                processor_id = (processor_name, thread_j)
                 self.init_processor_list.append(processor_id)
         # set self attributes
         self.init_mb_listener_proxy_list = list(mb_listener_proxy_dict.values())
@@ -458,16 +467,18 @@ class MsgProcAgentBase(GenericThread):
             try:
                 processor_name, thread_j = processor_id
                 attr_dict = self.processor_attr_map[processor_name]
-                self.processor_thread_map[processor_id] = SimpleMsgProcThread(
-                                                attr_dict, sleep_time=self.process_sleep_time, thread_j=thread_j)
+                plugin = self.processor_instance_map[processor_id]
+                self.processor_thread_map[processor_id] = SimpleMsgProcThread(plugin, attr_dict, 
+                                                                              sleep_time=self.process_sleep_time, 
+                                                                              thread_j=thread_j)
                 mc_thread = self.processor_thread_map[processor_id]
                 mc_thread.start()
                 tmp_logger.info('spawned processors thread {0} with plugin={1} , in_q={2}, out_q={3}'.format(
-                                                processor_id, attr_dict['plugin'].__class__.__name__,
+                                                processor_id, attr_dict['plugin_class_name'],
                                                 attr_dict['in_queue'], attr_dict['out_queue']))
             except Exception as e:
                 tmp_logger.error('failed to spawn processor thread {0} with plugin={1} , in_q={2}, out_q={3} ; {4}: {5} '.format(
-                                                processor_id, attr_dict['plugin'].__class__.__name__,
+                                                processor_id, attr_dict['plugin_class_name'],
                                                 attr_dict['in_queue'], attr_dict['out_queue'], e.__class__.__name__, e))
         tmp_logger.debug('done')
 
