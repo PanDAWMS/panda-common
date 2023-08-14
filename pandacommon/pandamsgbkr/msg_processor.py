@@ -54,6 +54,8 @@ def get_mb_proxy(name, sconf, qconf, mode='listener', **kwargs):
                             username=username,
                             passcode=passcode,
                             vhost=sconf.get('vhost'),
+                            send_heartbeat_ms=sconf.get('send_heartbeat_ms', 60000),
+                            recv_heartbeat_ms=sconf.get('recv_heartbeat_ms', 0),
                             wait=True,
                             ack_mode=qconf.get('ack_mode', 'client-individual'),
                             max_buffer_len=qconf.get('max_buffer_len', 999),
@@ -233,6 +235,8 @@ class MsgProcAgentBase(GenericThread):
         self.init_processor_list = []
         self.processor_attr_map = dict()
         self.processor_thread_map = dict()
+        self.passive_mb_listener_proxy_dict = dict()
+        self.passive_mb_sender_proxy_dict = dict()
         self.guard_period = 300
         self._last_guard_timestamp = 0
         self.prefetch_count = None
@@ -570,7 +574,6 @@ class MsgProcAgentBase(GenericThread):
         if out_q_list is None:
             out_q_list = all_queue_names
         # mb_listener_proxy instances
-        mb_listener_proxy_dict = dict()
         for in_queue in in_q_list:
             if in_queue not in self._queues_dict:
                 continue
@@ -579,9 +582,8 @@ class MsgProcAgentBase(GenericThread):
                 continue
             sconf = self._mb_servers_dict[qconf['server']]
             mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode='listener', prefetch_size=prefetch_size)
-            mb_listener_proxy_dict[in_queue] = mb_listener_proxy
+            self.passive_mb_listener_proxy_dict[in_queue] = mb_listener_proxy
         # mb_sender_proxy instances
-        mb_sender_proxy_dict = dict()
         for out_queue in out_q_list:
             if out_queue not in self._queues_dict:
                 continue
@@ -590,18 +592,37 @@ class MsgProcAgentBase(GenericThread):
                 continue
             sconf = self._mb_servers_dict[qconf['server']]
             mb_sender_proxy = get_mb_proxy(name=out_queue, sconf=sconf, qconf=qconf, mode='sender')
-            mb_sender_proxy_dict[out_queue] = mb_sender_proxy
+            self.passive_mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # spawn message broker listener proxy connections
-        for queue_name, mb_proxy in mb_listener_proxy_dict.items():
+        for queue_name, mb_proxy in self.passive_mb_listener_proxy_dict.items():
             mb_proxy.go()
             tmp_logger.debug('spawned listener proxy for {0}'.format(queue_name))
         # spawn message broker sender proxy connections
-        for queue_name, mb_proxy in mb_sender_proxy_dict.items():
+        for queue_name, mb_proxy in self.passive_mb_sender_proxy_dict.items():
             mb_proxy.go()
             tmp_logger.debug('spawned sender proxy for {0}'.format(queue_name))
         tmp_logger.debug('done')
         # return
         return {
-                'in': mb_listener_proxy_dict,
-                'out': mb_sender_proxy_dict,
+                'in': self.passive_mb_listener_proxy_dict,
+                'out': self.passive_mb_sender_proxy_dict,
             }
+
+    def stop_passive_mode(self):
+        """
+        stop mb proxies which were spawned in passive mode
+        """
+        tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='stop_passive_mode')
+        tmp_logger.debug('start')
+        # kill message broker listener proxy connections
+        for queue_name, mb_proxy in self.passive_mb_listener_proxy_dict.items():
+            mb_proxy.stop()
+            tmp_logger.debug('killed listener proxy for {0}'.format(queue_name))
+        # kill message broker sender proxy connections
+        for queue_name, mb_proxy in self.passive_mb_sender_proxy_dict.items():
+            mb_proxy.stop()
+            tmp_logger.debug('killed sender proxy for {0}'.format(queue_name))
+        # clean up
+        self.passive_mb_listener_proxy_dict = dict()
+        self.passive_mb_sender_proxy_dict = dict()
+        tmp_logger.debug('done')
