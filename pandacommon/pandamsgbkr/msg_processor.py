@@ -416,45 +416,45 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger.debug('start')
         for mb_proxy in mb_listener_proxy_list:
             mb_proxy.stop()
-            tmp_logger.info('signaled stop to listener {0}'.format(mb_proxy.name))
+            tmp_logger.info('stopped listener {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
     def _spawn_senders(self, mb_sender_proxy_list):
         """
-        spawn connection/listener threads of certain message broker sender proxy
+        spawn connection/sender threads of certain message broker sender proxy
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_spawn_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             mb_proxy.go()
-            tmp_logger.info('spawned listener {0}'.format(mb_proxy.name))
+            tmp_logger.info('spawned sender {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
     def _guard_senders(self, mb_sender_proxy_list):
         """
-        guard connection/listener threads of certain message broker sender proxy, reconnect when disconnected
+        guard connection/sender threads of certain message broker sender proxy, reconnect when disconnected
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_guard_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             if mb_proxy.got_disconnected and not mb_proxy.to_disconnect:
-                tmp_logger.debug('found listener {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
+                tmp_logger.debug('found sender {0} disconnected unexpectedly; trigger restart...'.format(mb_proxy.name))
                 mb_proxy.restart()
                 if mb_proxy.n_restart > 10:
-                    tmp_logger.warning('found listener {0} keep getting disconnected; already restarted {1} times'.format(
+                    tmp_logger.warning('found sender {0} keep getting disconnected; already restarted {1} times'.format(
                                                                                         mb_proxy.name, mb_proxy.n_restart))
-                tmp_logger.info('restarted listener {0}'.format(mb_proxy.name))
+                tmp_logger.info('restarted sender {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
     def _kill_senders(self, mb_sender_proxy_list):
         """
-        kill connection/listener threads of certain message broker sender proxy
+        kill connection/sender threads of certain message broker sender proxy
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='_kill_senders')
         tmp_logger.debug('start')
         for mb_proxy in mb_sender_proxy_list:
             mb_proxy.stop()
-            tmp_logger.info('signaled stop to listener {0}'.format(mb_proxy.name))
+            tmp_logger.info('stopped sender {0}'.format(mb_proxy.name))
         tmp_logger.debug('done')
 
     def _spawn_processors(self, processor_list):
@@ -607,11 +607,11 @@ class MsgProcAgentBase(GenericThread):
         # spawn message broker listener proxy connections
         for queue_name, mb_proxy in self.passive_mb_listener_proxy_dict.items():
             mb_proxy.go()
-            tmp_logger.debug('spawned listener proxy for {0}'.format(queue_name))
+            tmp_logger.debug('spawned listener for {0}'.format(queue_name))
         # spawn message broker sender proxy connections
         for queue_name, mb_proxy in self.passive_mb_sender_proxy_dict.items():
             mb_proxy.go()
-            tmp_logger.debug('spawned sender proxy for {0}'.format(queue_name))
+            tmp_logger.debug('spawned sender for {0}'.format(queue_name))
         tmp_logger.debug('done')
         # return
         return {
@@ -628,11 +628,11 @@ class MsgProcAgentBase(GenericThread):
         # kill message broker listener proxy connections
         for queue_name, mb_proxy in self.passive_mb_listener_proxy_dict.items():
             mb_proxy.stop()
-            tmp_logger.debug('killed listener proxy for {0}'.format(queue_name))
+            tmp_logger.debug('stopped listener for {0}'.format(queue_name))
         # kill message broker sender proxy connections
         for queue_name, mb_proxy in self.passive_mb_sender_proxy_dict.items():
             mb_proxy.stop()
-            tmp_logger.debug('killed sender proxy for {0}'.format(queue_name))
+            tmp_logger.debug('stopped sender for {0}'.format(queue_name))
         # clean up
         self.passive_mb_listener_proxy_dict = dict()
         self.passive_mb_sender_proxy_dict = dict()
