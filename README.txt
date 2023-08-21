@@ -7,6 +7,10 @@ Includes all libraries used by both server and monitor (and others).
 Release Note
 ------------
 
+* 0.0.43 (15/8/2023)
+  * allow to send message headers of msg_processor for priority or other message broker options
+  * improve efficiency of multi-threading msg_processor
+
 * 0.0.42 (11/8/2023)
   * updates on thread_utils.py
 

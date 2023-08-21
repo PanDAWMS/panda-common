@@ -525,19 +525,23 @@ class MBSenderProxy(object):
         self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
         self.got_disconnected = True
 
-    def send(self, data, headers=None):
+    def send(self, data, headers=None, **kwargs):
         """
         send a message to queue
         """
         if data is None:
             self.logger.debug('got None, not to send')
         else:
+            headers_dict = {}
+            if headers is not None:
+                headers_dict.update(headers)
+            headers_dict.update(kwargs)
             try:
-                self.conn.send(destination=self.destination, body=data, headers=headers)
+                self.conn.send(destination=self.destination, body=data, headers=headers_dict)
             except Exception as e:
                 tb_str = traceback.format_exc()
-                self.logger.error('failed to send message to {0} ; data={1} ; {2} \n{3}'.format(
-                                self.destination, data, e.__class__.__name__, tb_str))
+                self.logger.error('failed to send message to {0} ; data={1} headers={2} ; {3} \n{4}'.format(
+                                self.destination, data, headers_dict, e.__class__.__name__, tb_str))
             else:
                 if self.verbose:
                     self.logger.debug('send to {dest} | {data}'.format(dest=self.destination, data=data))
