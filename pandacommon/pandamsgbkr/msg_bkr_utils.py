@@ -481,7 +481,7 @@ class MBSenderProxy(object):
         random.seed(f'{fqdn_pid}:{tmp_timestamp_str}')
         n_rand = random.randrange(10**6)
         # subscription ID
-        self.sub_id = 'panda-MBListenerProxy_{0}_r{1:06}'.format(fqdn_pid, n_rand)
+        self.sub_id = 'panda-MBSenderProxy_{0}_r{1:06}'.format(fqdn_pid, n_rand)
         # client ID
         self.client_id = 'client_{0}_{1}'.format(self.sub_id, hex(id(self)))
         # connect parameters
