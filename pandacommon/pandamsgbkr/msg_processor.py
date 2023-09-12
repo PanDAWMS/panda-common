@@ -128,14 +128,15 @@ class SimpleMsgProcThread(GenericThread):
     Thread of simple message processor of certain plugin
     """
 
-    def __init__(self, plugin, attr_dict, sleep_time, thread_j):
+    def __init__(self, plugin, attr_dict, sleep_time_min, sleep_time_max, thread_j):
         GenericThread.__init__(self)
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name='SimpleMsgProcThread.__init__')
         self.__to_run = True
         self.plugin = plugin
         self.in_queue = attr_dict.get('in_queue')
         self.mb_sender_proxy = attr_dict.get('mb_sender_proxy')
-        self.sleep_time = sleep_time
+        self.sleep_time_min = sleep_time_min
+        self.sleep_time_max = sleep_time_max
         self.thread_j = thread_j
         self.verbose = attr_dict.get('verbose', False)
 
@@ -193,7 +194,10 @@ class SimpleMsgProcThread(GenericThread):
                 if self.verbose:
                     self.logger.debug('sent a processed message')
             # sleep
-            time.sleep(self.sleep_time)
+            if is_processed:
+                time.sleep(self.sleep_time_min)
+            else:
+                time.sleep(self.sleep_time_max)
         # stop loop
         self.logger.info('stopped loop')
         # tear down
@@ -225,11 +229,12 @@ class MsgProcAgentBase(GenericThread):
     Base class of message processing agent (main thread)
     """
 
-    def __init__(self, config_file, process_sleep_time=0.0001, **kwargs):
+    def __init__(self, config_file, process_sleep_time_min=0.0001, process_sleep_time_max=0.005, **kwargs):
         GenericThread.__init__(self)
         self.__to_run = True
         self.config_file = config_file
-        self.process_sleep_time = process_sleep_time
+        self.process_sleep_time_min = process_sleep_time_min
+        self.process_sleep_time_max = process_sleep_time_max
         self.init_mb_listener_proxy_list = []
         self.init_mb_sender_proxy_list = []
         self.init_processor_list = []
@@ -469,7 +474,8 @@ class MsgProcAgentBase(GenericThread):
                 attr_dict = self.processor_attr_map[processor_name]
                 plugin = self.processor_instance_map[processor_id]
                 self.processor_thread_map[processor_id] = SimpleMsgProcThread(plugin, attr_dict, 
-                                                                              sleep_time=self.process_sleep_time, 
+                                                                              sleep_time_min=self.process_sleep_time_min, 
+                                                                              sleep_time_max=self.process_sleep_time_max, 
                                                                               thread_j=thread_j)
                 mc_thread = self.processor_thread_map[processor_id]
                 mc_thread.start()
