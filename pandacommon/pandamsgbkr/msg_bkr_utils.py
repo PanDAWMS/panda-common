@@ -1,4 +1,5 @@
 import os
+import re
 import datetime
 import threading
 import socket
@@ -213,13 +214,23 @@ class MsgListener(stomp.ConnectionListener):
             return (None, headers, message)
 
     def on_error(self, *args):
+        self.logger.debug('on_error start')
         cmd, headers, body = self._parse_args(args)
         self.logger.error('on_error from {c}: {h} | {b}'.format(c=self.conn_id, h=headers, b=body))
+        self.mb_proxy._on_error(headers)
+        self.logger.debug('on_error done')
+    
+    def on_connected(self, *args):
+        self.logger.debug('on_connected start')
+        cmd, headers, body = self._parse_args(args)
+        self.logger.debug('on_connected from {c}: {h} | {b}'.format(c=self.conn_id, h=headers, b=body))
+        self.mb_proxy._on_connected(headers=headers)
+        self.logger.debug('on_connected done')
 
     def on_disconnected(self):
-        self.logger.info('on_disconnected start')
+        self.logger.debug('on_disconnected start')
         self.mb_proxy._on_disconnected(conn_id=self.conn_id)
-        self.logger.info('on_disconnected done')
+        self.logger.debug('on_disconnected done')
 
     def on_send(self, *args):
         cmd, headers, body = self._parse_args(args)
@@ -239,8 +250,41 @@ class MsgListener(stomp.ConnectionListener):
             self.logger.debug('on_message done: {h}'.format(h=headers))
 
 
+# message broker proxy base
+class MBProxyBase(object):
+
+    def is_connected_to_rabbitmq(self):
+        return getattr(self, 'mq_server', None) and self.mq_server.startswith('RabbitMQ/')
+
+    def _on_connected(self, headers):
+        # fill mq_server
+        self.mq_server = headers.get('server')
+        # rabbitmq
+        if self.is_connected_to_rabbitmq():
+            if not getattr(self, '_to_freeze_dest', False) and self.destination.startswith('/queue'):
+                # destination change for rabbitmq queue /queue vs /amq/queue
+                self.destination = re.sub(r'^/queue/', '/amq/queue/', self.orig_destination)
+                self.new_destination = self.destination
+                self.logger.debug(f'_on_connected : connected RabbitMQ; modified destination into {self.destination}')
+    
+    def _on_disconnected(self, conn_id):
+        self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
+        self.got_disconnected = True
+    
+    def _on_error(self, headers):
+        # reset new_destination and restart if getting rabbitmq not_found for queue
+        if self.is_connected_to_rabbitmq and headers.get('message') == 'not_found':
+            if self.destination.startswith('/amq/queue'):
+                # new_destination change for rabbitmq queue /queue vs /amq/queue
+                self.new_destination = re.sub(r'^/amq/queue/', '/queue/', self.orig_destination)
+                self._to_freeze_dest = True
+            self.logger.debug(f'_on_error : got not_found from RabbitMQ; modified new destination into {self.new_destination} ; restarting')
+            self.restart()
+            self.logger.debug(f'_on_error : restarted')
+
+
 # message broker proxy for receiver
-class MBListenerProxy(object):
+class MBListenerProxy(MBProxyBase):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, ack_mode='client-individual', skip_buffer=False, conn_mode='all',
@@ -256,8 +300,14 @@ class MBListenerProxy(object):
         self.cert_file = cert_file
         self.key_file = key_file
         self.vhost = vhost
-        # destination queue to subscribe
-        self.destination = destination
+        # original destination
+        self.orig_destination = destination
+        # lock for destination change
+        self.dest_lock = threading.Lock()
+        # destination to subscribe
+        self.destination = self.orig_destination
+        # destination used in retry
+        self.new_destination = self.orig_destination
         # randomness
         fqdn_pid = get_fqdn_pid()
         tmp_timestamp_str = str(time.time())
@@ -394,23 +444,22 @@ class MBListenerProxy(object):
                 n_buffered_msg = self.msg_buffer.size()
                 self.logger.debug('_on_message put into buffer ({nbm}): {h}'.format(nbm=n_buffered_msg, h=headers))
 
-    def _on_disconnected(self, conn_id):
-        self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
-        self.got_disconnected = True
-
     def go(self):
         self.logger.debug('go called')
         self.to_disconnect = False
+        self.logger.debug(f'last destination is {self.destination}, new destination is {self.new_destination}')
+        self.destination = self.new_destination
         for conn_id, conn in self.connection_dict.items():
             try:
                 if not conn.is_connected():
                     listener = self.listener_dict[conn_id]
                     self.got_disconnected = False
                     conn.set_listener(listener.__class__.__name__, listener)
-                    conn.connect(**self.connect_params)
-                    conn.subscribe(destination=self.destination, id=self.sub_id, ack=self.ack_mode,
-                                    headers=self.subscription_headers)
-                    self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
+                    with self.dest_lock:
+                        conn.connect(**self.connect_params)
+                        conn.subscribe(destination=self.destination, id=self.sub_id, ack=self.ack_mode,
+                                        headers=self.subscription_headers)
+                        self.logger.info('connected to {0} {1}'.format(conn_id, self.destination))
                 else:
                     self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
                                                                         conn_id, self.destination))
@@ -458,7 +507,7 @@ class MBListenerProxy(object):
 
 
 # message broker proxy for sender, waster...
-class MBSenderProxy(object):
+class MBSenderProxy(MBProxyBase):
 
     def __init__(self, name, host_port_list, destination, use_ssl=False, cert_file=None, key_file=None, vhost=None,
                     username=None, passcode=None, wait=True, verbose=False,
@@ -473,8 +522,14 @@ class MBSenderProxy(object):
         self.cert_file = cert_file
         self.key_file = key_file
         self.vhost = vhost
-        # destination queue to subscribe
-        self.destination = destination
+        # original destination
+        self.orig_destination = destination
+        # lock for destination change
+        self.dest_lock = threading.Lock()
+        # destination to subscribe
+        self.destination = self.orig_destination
+        # destination used in retry
+        self.new_destination = self.orig_destination
         # randomness
         fqdn_pid = get_fqdn_pid()
         tmp_timestamp_str = str(time.time())
@@ -521,10 +576,6 @@ class MBSenderProxy(object):
         if self.verbose:
             self.logger.debug('_on_message from {c} drop message: {h} | {b}'.format(c=conn_id, h=headers, b=body))
 
-    def _on_disconnected(self, conn_id):
-        self.logger.debug('_on_disconnected from {c} called'.format(c=conn_id))
-        self.got_disconnected = True
-
     def send(self, data, headers=None, **kwargs):
         """
         send a message to queue
@@ -558,17 +609,20 @@ class MBSenderProxy(object):
     def go(self):
         self.logger.debug('go called')
         self.to_disconnect = False
+        self.logger.debug(f'last destination is {self.destination}, new destination is {self.new_destination}')
+        self.destination = self.new_destination
         try:
             if not self.conn.is_connected():
                 self.got_disconnected = False
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
-                self.conn.connect(**self.connect_params)
-                # add removers
-                with self.remover_lock:
-                    for r_id in self.removers:
-                        headers = self.removers[r_id]['headers']
-                        self.conn.subscribe(destination=self.destination, headers=headers, id=r_id, ack='auto')
-                self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
+                with self.dest_lock:
+                    self.conn.connect(**self.connect_params)
+                    # add removers
+                    with self.remover_lock:
+                        for r_id in self.removers:
+                            headers = self.removers[r_id]['headers']
+                            self.conn.subscribe(destination=self.destination, headers=headers, id=r_id, ack='auto')
+                    self.logger.info('connected to {0} {1}'.format(self.conn_id, self.destination))
             else:
                 self.logger.info('connection to {0} {1} already exists. Skipped...'.format(
                                                                         self.conn_id, self.destination))
