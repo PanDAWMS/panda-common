@@ -1,3 +1,5 @@
+import sys
+import traceback
 import inspect
 
 from .PandaLogger import PandaLogger
@@ -15,16 +17,13 @@ def enable_memory_profiling():
 
 
 # setup logger
-def setup_logger(name=None):
+def setup_logger(name=None, log_level=None):
     if name is None:
         frm = inspect.stack()[1][0]
         mod = inspect.getmodule(frm)
         name = mod.__name__.split('.')[-1]
-    try:
-        log_level = getattr(harvester_config.log_level, name)
+    if log_level:
         return PandaLogger().getLogger(name, log_level=log_level)
-    except Exception:
-        pass
     return PandaLogger().getLogger(name)
 
 
@@ -38,7 +37,7 @@ def make_logger(tmp_log, token=None, method_name=None, hook=None):
     if token is not None:
         tmpStr += ' <{0}>'.format(token)
     else:
-        tmpStr += ' :'.format(token)
+        tmpStr += ' :'
     newLog = LogWrapper(tmp_log, tmpStr, seeMem=with_memory_profile, hook=hook)
     return newLog
 
