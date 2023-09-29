@@ -1,11 +1,12 @@
-import resource
 import datetime
+import resource
+
 from .PandaLogger import PandaLogger
 
 
 # wrapper to set prefix to logging messages
 class LogWrapper:
-    def __init__(self, log, prefix="", lineLimit=100, monToken=None, seeMem=False, hook=None):
+    def __init__(self, log, prefix="", line_limit=100, monToken=None, seeMem=False, hook=None):
         # use timestamp as prefix
         if prefix is None:
             self.prefix = datetime.datetime.utcnow().isoformat("/")
@@ -14,14 +15,14 @@ class LogWrapper:
         # logger instance
         self.logger = log
         # message buffer
-        self.msgBuffer = []
-        self.lineLimit = lineLimit
+        self.msg_buffer = []
+        self.line_limit = line_limit
         # token for monitor
         if monToken is not None:
-            self.monToken = monToken
+            self.mon_token = monToken
         else:
-            self.monToken = self.prefix
-        self.seeMem = seeMem
+            self.mon_token = self.prefix
+        self.see_mem = seeMem
         self.hook = hook
         try:
             self.name = self.logger.name.split(".")[-1]
@@ -34,10 +35,10 @@ class LogWrapper:
 
     def keepMsg(self, msg):
         # keep max message depth
-        if len(self.msgBuffer) > self.lineLimit:
-            self.msgBuffer.pop(0)
+        if len(self.msg_buffer) > self.line_limit:
+            self.msg_buffer.pop(0)
         timeNow = datetime.datetime.utcnow()
-        self.msgBuffer.append("{0} : {1}".format(timeNow.isoformat(" "), msg))
+        self.msg_buffer.append("{0} : {1}".format(timeNow.isoformat(" "), msg))
 
     def debug(self, msg):
         msg = str(msg)
@@ -49,7 +50,7 @@ class LogWrapper:
             pass
         if self.prefix != "":
             msg = self.prefix + " " + str(msg)
-        if self.seeMem:
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.debug(msg)
 
@@ -63,7 +64,7 @@ class LogWrapper:
             pass
         if self.prefix != "":
             msg = self.prefix + " " + str(msg)
-        if self.seeMem:
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.info(msg)
 
@@ -77,7 +78,7 @@ class LogWrapper:
             pass
         if self.prefix != "":
             msg = self.prefix + " " + str(msg)
-        if self.seeMem:
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.error(msg)
 
@@ -91,7 +92,7 @@ class LogWrapper:
             pass
         if self.prefix != "":
             msg = self.prefix + " " + str(msg)
-        if self.seeMem:
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.warning(msg)
 
@@ -105,39 +106,39 @@ class LogWrapper:
             pass
         if self.prefix != "":
             msg = self.prefix + " " + str(msg)
-        if self.seeMem:
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.critical(msg)
 
     def dumpToString(self):
-        strMsg = ""
-        for msg in self.msgBuffer:
-            strMsg += msg
-            strMsg += "\n"
-        return strMsg
+        str_msg = ""
+        for msg in self.msg_buffer:
+            str_msg += msg
+            str_msg += "\n"
+        return str_msg
 
     # send message to logger
-    def sendMsg(self, message, loggerName, msgType, msgLevel="info"):
+    def sendMsg(self, message, logger_name, msg_type, msgLevel="info"):
         try:
             # get logger
-            tmpPandaLogger = PandaLogger()
+            tmp_panda_logger = PandaLogger()
             # lock HTTP handler
-            tmpPandaLogger.lock()
-            tmpPandaLogger.setParams({"Type": msgType})
+            tmp_panda_logger.lock()
+            tmp_panda_logger.setParams({"Type": msg_type})
             # get logger
-            tmpLogger = tmpPandaLogger.getHttpLogger(loggerName)
+            tmp_logger = tmp_panda_logger.getHttpLogger(logger_name)
             # add message
-            message = self.monToken + " " + message
+            message = self.mon_token + " " + message
             if msgLevel == "error":
-                tmpLogger.error(message)
+                tmp_logger.error(message)
             elif msgLevel == "warning":
-                tmpLogger.warning(message)
+                tmp_logger.warning(message)
             elif msgLevel == "info":
-                tmpLogger.info(message)
+                tmp_logger.info(message)
             else:
-                tmpLogger.debug(message)
+                tmp_logger.debug(message)
         except Exception:
             pass
         finally:
             # release HTTP handler
-            tmpPandaLogger.release()
+            tmp_panda_logger.release()

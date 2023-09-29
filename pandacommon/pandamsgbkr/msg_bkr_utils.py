@@ -1,25 +1,24 @@
-import os
-import re
+import collections
+import copy
 import datetime
-import threading
+import os
+import random
+import re
 import socket
 import ssl
-import random
-import uuid
-import collections
+import threading
 import time
-import copy
 import traceback
+import uuid
 
 try:
-    from queue import Queue, Empty
+    from queue import Empty, Queue
 except ImportError:
-    from Queue import Queue, Empty
+    from Queue import Empty, Queue
 
 import stomp
 
 from pandacommon.pandalogger import logger_utils
-
 
 # logger
 base_logger = logger_utils.setup_logger("msg_bkr_utils")
@@ -28,12 +27,12 @@ base_logger = logger_utils.setup_logger("msg_bkr_utils")
 _GLOBAL_LOCK = threading.Lock()
 
 # global map of message buffers
-_BUFFER_MAP = dict()
+_BUFFER_MAP = {}
 
 
 # get connection dict
 def _get_connection_dict(
-    host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, force=False, keepalive=True, send_heartbeat_ms=60000, recv_heartbeat_ms=0
+    host_port_list, use_ssl=False, cert_file=None, key_file=None, vhost=None, keepalive=True, send_heartbeat_ms=60000, recv_heartbeat_ms=0
 ):
     """
     get dict {conn_id: connection}
@@ -81,7 +80,7 @@ def get_fqdn_pid():
 
 
 # message buffer
-class MsgBuffer(object):
+class MsgBuffer:
     """
     Global message buffer. Singleton for each queue name
     """
@@ -89,11 +88,11 @@ class MsgBuffer(object):
     @staticmethod
     def _initialize(self, queue_name):
         """
-        Write init here becuase of singleton
+        Write init here because of singleton
         """
         # name of the message queue
         self.queue_name = queue_name
-        # interal fifo
+        # interval fifo
         self.__fifo = collections.deque()
 
     def __new__(cls, queue_name):
@@ -199,11 +198,12 @@ class MsgListener(stomp.ConnectionListener):
         if len(args) == 1:
             # [frame] : in newer version
             frame = args[0]
-            return (frame.cmd, frame.headers, frame.body)
-        elif len(args) == 2:
+            return frame.cmd, frame.headers, frame.body
+
+        if len(args) == 2:
             # [headers, message] : in older version
             headers, message = args
-            return (None, headers, message)
+            return None, headers, message
 
     def on_error(self, *args):
         self.logger.debug("on_error start")
@@ -243,7 +243,7 @@ class MsgListener(stomp.ConnectionListener):
 
 
 # message broker proxy base
-class MBProxyBase(object):
+class MBProxyBase:
     def is_connected_to_rabbitmq(self):
         return getattr(self, "mq_server", None) and self.mq_server.startswith("RabbitMQ/")
 

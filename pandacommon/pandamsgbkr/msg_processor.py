@@ -1,14 +1,13 @@
+import json
 import os
 import re
 import time
-import socket
-import json
-import logging
 
-from .msg_bkr_utils import MsgBuffer, MBListenerProxy, MBSenderProxy
-from pandacommon.pandautils.thread_utils import GenericThread
-from pandacommon.pandautils.plugin_factory import PluginFactory
 from pandacommon.pandalogger import logger_utils
+from pandacommon.pandautils.plugin_factory import PluginFactory
+from pandacommon.pandautils.thread_utils import GenericThread
+
+from .msg_bkr_utils import MBListenerProxy, MBSenderProxy, MsgBuffer
 
 # logger
 base_logger = logger_utils.setup_logger("msg_processor")
@@ -28,21 +27,24 @@ def get_mb_proxy(name, sconf, qconf, mode="listener", **kwargs):
     if host_port_list:
         new_list = []
         for host_port in host_port_list:
-            m = re.search(r"^\${(\w+)\}$", host_port)
-            if m and m.group(1) in os.environ:
-                host_port = os.environ[m.group(1)]
+            match = re.search(r"^\${(\w+)\}$", host_port)
+            if match and match.group(1) in os.environ:
+                host_port = os.environ[match.group(1)]
             new_list += host_port.split(",")
         host_port_list = new_list
     username = sconf.get("username")
+
     if username:
-        m = re.search(r"^\${(\w+)\}$", username)
-        if m and m.group(1) in os.environ:
-            username = os.environ[m.group(1)]
+        match = re.search(r"^\${(\w+)\}$", username)
+        if match and match.group(1) in os.environ:
+            username = os.environ[match.group(1)]
     passcode = sconf.get("passcode")
+
     if passcode:
-        m = re.search(r"^\${(\w+)\}$", passcode)
-        if m and m.group(1) in os.environ:
-            passcode = os.environ[m.group(1)]
+        match = re.search(r"^\${(\w+)\}$", passcode)
+        if match and match.group(1) in os.environ:
+            passcode = os.environ[match.group(1)]
+
     # instantiate
     mb_proxy = the_class(
         name=name,
@@ -68,7 +70,7 @@ def get_mb_proxy(name, sconf, qconf, mode="listener", **kwargs):
 
 
 # simple message processor plugin Base
-class SimpleMsgProcPluginBase(object):
+class SimpleMsgProcPluginBase:
     """
     Base class of simple message processor plugin
     Simple message processor suits following cases:
@@ -89,13 +91,11 @@ class SimpleMsgProcPluginBase(object):
         """
         initialize plugin instance, run once before loop in thread
         """
-        pass
 
     def terminate(self):
         """
         terminate plugin instance, run before stopping the thread
         """
-        pass
 
     def process(self, msg_obj):
         """
@@ -113,14 +113,13 @@ class SimpleMsgProcPluginBase(object):
 
 
 # muti-message processor plugin Base
-class MultiMsgProcPluginBase(object):
+class MultiMsgProcPluginBase:
     """
     Base class of multi-message processor plugin
     For multi-in-multi-out message processor thread
     """
 
     # TODO
-    pass
 
 
 # simple message processor thread
@@ -220,7 +219,6 @@ class MultiMsgProcThread(GenericThread):
     """
 
     # TODO
-    pass
 
 
 # message processing agent base
@@ -238,11 +236,11 @@ class MsgProcAgentBase(GenericThread):
         self.init_mb_listener_proxy_list = []
         self.init_mb_sender_proxy_list = []
         self.init_processor_list = []
-        self.processor_attr_map = dict()
-        self.processor_instance_map = dict()
-        self.processor_thread_map = dict()
-        self.passive_mb_listener_proxy_dict = dict()
-        self.passive_mb_sender_proxy_dict = dict()
+        self.processor_attr_map = {}
+        self.processor_instance_map = {}
+        self.processor_thread_map = {}
+        self.passive_mb_listener_proxy_dict = {}
+        self.passive_mb_sender_proxy_dict = {}
         self.guard_period = 300
         self._last_guard_timestamp = 0
         self.prefetch_count = None
@@ -313,7 +311,7 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="_setup_instances")
         tmp_logger.debug("start")
         # processor thread attribute dict
-        processor_attr_map = dict()
+        processor_attr_map = {}
         # inward/outward queues and plugin instances
         in_q_set = set()
         out_q_set = set()
@@ -340,13 +338,13 @@ class MsgProcAgentBase(GenericThread):
                 if thread_j == 0:
                     plugin_class_name = plugin.__class__.__name__
             # fill in thread attribute dict
-            processor_attr_map[proc] = dict()
+            processor_attr_map[proc] = {}
             processor_attr_map[proc]["n_threads"] = n_threads
             processor_attr_map[proc]["in_queue"] = in_queue
             processor_attr_map[proc]["out_queue"] = out_queue
             processor_attr_map[proc]["plugin_class_name"] = plugin_class_name
         # mb_listener_proxy instances
-        mb_listener_proxy_dict = dict()
+        mb_listener_proxy_dict = {}
         for in_queue in in_q_set:
             qconf = self._queues_dict[in_queue]
             if not qconf.get("enable", True):
@@ -355,7 +353,7 @@ class MsgProcAgentBase(GenericThread):
             mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode="listener")
             mb_listener_proxy_dict[in_queue] = mb_listener_proxy
         # mb_sender_proxy instances
-        mb_sender_proxy_dict = dict()
+        mb_sender_proxy_dict = {}
         for out_queue in out_q_set:
             qconf = self._queues_dict[out_queue]
             if not qconf.get("enable", True):
@@ -521,7 +519,7 @@ class MsgProcAgentBase(GenericThread):
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="initialize")
         tmp_logger.debug("start")
-        pass
+
         tmp_logger.debug("done")
 
     def stop(self, block=True):
@@ -640,6 +638,6 @@ class MsgProcAgentBase(GenericThread):
             mb_proxy.stop()
             tmp_logger.debug("stopped sender for {0}".format(queue_name))
         # clean up
-        self.passive_mb_listener_proxy_dict = dict()
-        self.passive_mb_sender_proxy_dict = dict()
+        self.passive_mb_listener_proxy_dict = {}
+        self.passive_mb_sender_proxy_dict = {}
         tmp_logger.debug("done")

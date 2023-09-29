@@ -1,15 +1,17 @@
-#
-# Module for sending messages to Kafka that will be used
-# by the panda server and JEDI to publish task/job state transitions.
-# pandamon will consume those messages for realtime logging.
-#
+""""
+ Module for sending messages to Kafka that will be used
+ by the panda server and JEDI to publish task/job state transitions.
+ pandamon will consume those messages for realtime logging.
+"""
 
-import json
 import hashlib
+import json
 import socket
+
 from confluent_kafka import Producer
-from pandacommon.pandalogger import logger_utils
+
 from pandacommon.commonconfig import common_config
+from pandacommon.pandalogger import logger_utils
 
 
 class KafkaPublisher:

@@ -1,9 +1,9 @@
-import os
-import threading
-import socket
 import datetime
-import random
 import multiprocessing
+import os
+import random
+import socket
+import threading
 
 
 class GenericThread(threading.Thread):
@@ -92,12 +92,12 @@ class WeightedLists(object):
 
     def __len__(self):
         with self.lock:
-            l = 0
+            len_data = 0
             data = self.data.get()
             for item in data:
-                l += len(data[item])
+                len_data += len(data[item])
             self.data.put(data)
-            return l
+            return len_data
 
     def add(self, weight, list_data):
         if not list_data or weight <= 0:

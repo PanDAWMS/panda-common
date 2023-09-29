@@ -1,7 +1,6 @@
 import sys
-import time
-import datetime
 import tempfile
+import time
 
 from pandacommon.pandalogger.PandaLogger import PandaLogger
 from pandacommon.pandamsgbkr import msg_bkr_utils, msg_processor
@@ -48,7 +47,7 @@ CONFIG_JSON = """
         },
         "P2": {
             "module": "pandacommon.test.mb_test",
-            "name": "TestMsg_processorPlugin_2",
+            "name": "TestMsgProcessorPlugin2",
             "in_queue": "Q2",
             "out_queue": "Q4"
         }
@@ -90,8 +89,8 @@ logger = PandaLogger().getLogger("mb_test_thread", log_level="DEBUG")
 
 
 # verification set
-answer_A_set = {"A{0}".format(i) for i in range(20)}
-answer_B_set = {"B{0}".format(i) for i in range(20)}
+answer_set_a = {"A{0}".format(i) for i in range(20)}
+answer_set_b = {"B{0}".format(i) for i in range(20)}
 
 
 # class
@@ -107,19 +106,19 @@ class TestMsg_processorPlugin_1(msg_processor.SimpleMsgProcPluginBase):
         return msg_obj.data
 
 
-class TestMsg_processorPlugin_2(msg_processor.SimpleMsgProcPluginBase):
+class TestMsgProcessorPlugin2(msg_processor.SimpleMsgProcPluginBase):
     def initialize(self):
-        logger.debug("TestMsg_processorPlugin_2.initialize called")
+        logger.debug("TestMsgProcessorPlugin2.initialize called")
 
     def process(self, msg_obj):
-        logger.debug("TestMsg_processorPlugin_2.process called")
+        logger.debug("TestMsgProcessorPlugin2.process called")
         logger.info("got message obj: sub_id={s}, msg_id={m}, data={d}".format(s=msg_obj.sub_id, m=msg_obj.msg_id, d=msg_obj.data))
         return msg_obj.data
 
 
-class TestMsg_processorAgent(msg_processor.MsgProcAgentBase):
+class TestMsgProcessorAgent(msg_processor.MsgProcAgentBase):
     def initialize(self):
-        logger.debug("TestMsg_processorAgent.initialize called")
+        logger.debug("TestMsgProcessorAgent.initialize called")
         pass
 
 
@@ -172,10 +171,10 @@ def main():
     # processor agent
     sys.stderr.write("Run processor agent ...")
     sys.stderr.flush()
-    temp_conifg = tempfile.NamedTemporaryFile(mode="w+t")
-    temp_conifg.write(CONFIG_JSON)
-    temp_conifg.flush()
-    processor_agent = TestMsg_processorAgent(config_file=temp_conifg.name)
+    tmp_config = tempfile.NamedTemporaryFile(mode="w+t")
+    tmp_config.write(CONFIG_JSON)
+    tmp_config.flush()
+    processor_agent = TestMsgProcessorAgent(config_file=tmp_config.name)
     processor_agent.start()
     time.sleep(5)
     sys.stderr.write("\t OK! \n")
@@ -210,21 +209,21 @@ def main():
     processor_agent.stop()
     while processor_agent.is_alive():
         time.sleep(2)
-    temp_conifg.close()
+    tmp_config.close()
     sys.stderr.write("\t\t OK! \n")
 
     # verify
     sys.stderr.write("Verify result...")
     sys.stderr.flush()
-    test_A_set = set(receiver_3.dump_msgs)
-    test_A_len = len(receiver_3.dump_msgs)
-    test_B_set = set(receiver_4.dump_msgs)
-    test_B_len = len(receiver_4.dump_msgs)
-    if answer_A_set == test_A_set and test_A_len == len(answer_A_set) and answer_B_set == test_B_set and test_B_len == len(answer_B_set):
+    test_set_a = set(receiver_3.dump_msgs)
+    test_len_a = len(receiver_3.dump_msgs)
+    test_set_b = set(receiver_4.dump_msgs)
+    test_len_b = len(receiver_4.dump_msgs)
+    if answer_set_a == test_set_a and test_len_a == len(answer_set_a) and answer_set_b == test_set_b and test_len_b == len(answer_set_b):
         sys.stderr.write("\t OK! \n")
     else:
-        print(answer_A_set, receiver_3.dump_msgs)
-        print(answer_B_set, receiver_4.dump_msgs)
+        print(answer_set_a, receiver_3.dump_msgs)
+        print(answer_set_b, receiver_4.dump_msgs)
         sys.stderr.write("\t Failed! Check logs for details \n")
 
     # end
