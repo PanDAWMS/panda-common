@@ -1,6 +1,6 @@
 #
-# Module to be/wrap a ConfigParser instance, providing simple access via standard Python member 
-# and Dictionary interfaces. This is purely for convenience 
+# Module to be/wrap a ConfigParser instance, providing simple access via standard Python member
+# and Dictionary interfaces. This is purely for convenience
 #
 # [default]
 #   key1=value1
@@ -28,20 +28,20 @@ try:
 except ImportError:
     from ConfigParser import ConfigParser, NoSectionError
 
+
 class LiveConfigParser(ConfigParser):
-    
     def __init__(self, *args, **kwargs):
-        ConfigParser.__init__(self, *args, **kwargs )
-    
+        ConfigParser.__init__(self, *args, **kwargs)
+
     # We want to retain case sensitivity
     def optionxform(self, optionstr):
-        return optionstr  
-    
+        return optionstr
+
     def __getattr__(self, a):
         try:
             i = self.items(a)
             d = {}
-            for (key,val) in i:
+            for key, val in i:
                 d[key] = val
             return d
         except NoSectionError:
@@ -51,21 +51,21 @@ class LiveConfigParser(ConfigParser):
     def read(self, fileName, config_url=None):
         confFiles = [
             # system
-            '/etc/panda/%s' % fileName,
-            '/usr/etc/panda/%s' % fileName,
+            "/etc/panda/%s" % fileName,
+            "/usr/etc/panda/%s" % fileName,
             # home dir
-            os.path.expanduser('~/etc/panda/%s' % fileName),
-            ]
+            os.path.expanduser("~/etc/panda/%s" % fileName),
+        ]
         # use PANDA_HOME if it is defined
-        if 'PANDA_HOME'in os.environ:
-            confFiles.append('%s/etc/panda/%s' % (os.environ['PANDA_HOME'], fileName))
-            confFiles.append('%s/usr/etc/panda/%s' % (os.environ['PANDA_HOME'], fileName))
+        if "PANDA_HOME" in os.environ:
+            confFiles.append("%s/etc/panda/%s" % (os.environ["PANDA_HOME"], fileName))
+            confFiles.append("%s/usr/etc/panda/%s" % (os.environ["PANDA_HOME"], fileName))
         # read from URL
         if config_url is not None:
             try:
                 res = urlopen(config_url)
             except Exception as e:
-                raise Exception('failed to load cfg from URL={0} since {1}'.format(config_url, str(e)))
+                raise Exception("failed to load cfg from URL={0} since {1}".format(config_url, str(e)))
             ConfigParser.read_file(self, res)
         # read
         ConfigParser.read(self, confFiles)
@@ -76,17 +76,17 @@ def expand_values(target, values_dict):
     for tmpKey in values_dict:
         tmpVal = values_dict[tmpKey]
         # env variable
-        m = re.search(r'^\$\{*(\w+)\}*$', tmpVal)
+        m = re.search(r"^\$\{*(\w+)\}*$", tmpVal)
         if m and m.group(1) in os.environ:
             tmpVal = os.environ[m.group(1)]
         # convert string to bool/int
-        if tmpVal == 'True':
+        if tmpVal == "True":
             tmpVal = True
-        elif tmpVal == 'False':
+        elif tmpVal == "False":
             tmpVal = False
-        elif tmpVal == 'None':
+        elif tmpVal == "None":
             tmpVal = None
-        elif isinstance(tmpVal, str) and re.match('^\d+$', tmpVal):
+        elif isinstance(tmpVal, str) and re.match("^\d+$", tmpVal):
             tmpVal = int(tmpVal)
         # update dict
         target.__dict__[tmpKey] = tmpVal

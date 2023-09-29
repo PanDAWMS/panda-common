@@ -4,7 +4,7 @@ from ..liveconfigparser.LiveConfigParser import LiveConfigParser
 tmpConf = LiveConfigParser()
 
 # read
-tmpConf.read('panda_common.cfg')
+tmpConf.read("panda_common.cfg")
 
 
 # get section

@@ -19,7 +19,7 @@ def setup_logger(name=None):
     if name is None:
         frm = inspect.stack()[1][0]
         mod = inspect.getmodule(frm)
-        name = mod.__name__.split('.')[-1]
+        name = mod.__name__.split(".")[-1]
     try:
         log_level = getattr(harvester_config.log_level, name)
         return PandaLogger().getLogger(name, log_level=log_level)
@@ -36,9 +36,9 @@ def make_logger(tmp_log, token=None, method_name=None, hook=None):
     else:
         tmpStr = method_name
     if token is not None:
-        tmpStr += ' <{0}>'.format(token)
+        tmpStr += " <{0}>".format(token)
     else:
-        tmpStr += ' :'.format(token)
+        tmpStr += " :".format(token)
     newLog = LogWrapper(tmp_log, tmpStr, seeMem=with_memory_profile, hook=hook)
     return newLog
 
@@ -46,9 +46,9 @@ def make_logger(tmp_log, token=None, method_name=None, hook=None):
 # dump error message
 def dump_error_message(tmp_log, err_str=None, no_message=False):
     if not isinstance(tmp_log, LogWrapper):
-        methodName = '{0} : '.format(inspect.stack()[1][3])
+        methodName = "{0} : ".format(inspect.stack()[1][3])
     else:
-        methodName = ''
+        methodName = ""
     # error
     if err_str is None:
         errtype, errvalue = sys.exc_info()[:2]

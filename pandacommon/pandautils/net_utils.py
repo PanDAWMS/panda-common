@@ -5,6 +5,7 @@ import socket
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.connection import allowed_gai_family
+
 try:
     from urllib.parse import urlparse
 except ImportError:
@@ -18,8 +19,7 @@ dnsMap = MapWithLockAndTimeout()
 
 
 # HTTP adaptor with randomized DNS resolution
-class HTTPAdapterWithRandomDnsResolver (HTTPAdapter):
-
+class HTTPAdapterWithRandomDnsResolver(HTTPAdapter):
     # override to get connection to random host
     def get_connection(self, url, proxies=None):
         # parse URL
@@ -27,7 +27,7 @@ class HTTPAdapterWithRandomDnsResolver (HTTPAdapter):
         host = parsed.hostname
         port = parsed.port
         if port is None:
-            if parsed.scheme == 'http':
+            if parsed.scheme == "http":
                 port = 80
             else:
                 port = 443
@@ -46,7 +46,7 @@ class HTTPAdapterWithRandomDnsResolver (HTTPAdapter):
         for hostname in dnsRecord:
             addr = hostname
             if parsed.port is not None:
-                addr += ':{0}'.format(parsed.port)
+                addr += ":{0}".format(parsed.port)
             tmp_url = parsed._replace(netloc=addr).geturl()
             try:
                 con = HTTPAdapter.get_connection(self, tmp_url, proxies=proxies)
@@ -64,9 +64,9 @@ class HTTPAdapterWithRandomDnsResolver (HTTPAdapter):
 def get_http_adapter_with_random_dns_resolution():
     session = requests.Session()
     # no randomization if panda is behind real load balancer than DNS LB
-    if 'PANDA_BEHIND_REAL_LB' in os.environ:
+    if "PANDA_BEHIND_REAL_LB" in os.environ:
         return session
     adapter = HTTPAdapterWithRandomDnsResolver(max_retries=0)
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
     return session
