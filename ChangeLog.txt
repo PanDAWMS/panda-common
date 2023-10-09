@@ -1,6 +1,9 @@
 Release Notes
 -------------
 
+* 0.0.45 (09/10/2023)
+  * Autoformatting, linting and adding pre-commit configuration
+
 * 0.0.43 (15/8/2023)
   * allow to send message headers of msg_processor for priority or other message broker options
   * improve efficiency of multi-threading msg_processor
