@@ -1,13 +1,12 @@
-import os
-import threading
-import socket
 import datetime
-import random
 import multiprocessing
+import os
+import random
+import socket
+import threading
 
 
 class GenericThread(threading.Thread):
-
     def __init__(self, **kwargs):
         threading.Thread.__init__(self, **kwargs)
         self.hostname = socket.gethostname()
@@ -31,7 +30,7 @@ class GenericThread(threading.Thread):
         get host/process/thread identifier
         """
         thread_id = self.get_thread_id(current)
-        return '{0}_{1}-{2}'.format(self.hostname, self.os_pid, format(thread_id, 'x'))
+        return "{0}_{1}-{2}".format(self.hostname, self.os_pid, format(thread_id, "x"))
 
     def get_full_id(self, module_name, file_name):
         """
@@ -43,20 +42,18 @@ class GenericThread(threading.Thread):
         thread_id = self.get_thread_id()
 
         file_basename = os.path.basename(file_name)  # remove the path for better readability
-        full_id = "host={0} filename={1} module={2} process={3} thread={4}".format(host_id, file_basename, module_name,
-                                                                                   process_id, thread_id)
+        full_id = "host={0} filename={1} module={2} process={3} thread={4}".format(host_id, file_basename, module_name, process_id, thread_id)
 
         return full_id
 
 
 # map with lock
 class MapWithLockAndTimeout(dict):
-
     def __init__(self, *args, **kwargs):
         # set timeout
-        if 'timeout' in kwargs:
-            self.timeout = kwargs['timeout']
-            del kwargs['timeout']
+        if "timeout" in kwargs:
+            self.timeout = kwargs["timeout"]
+            del kwargs["timeout"]
         else:
             self.timeout = 10
         self.lock = threading.Lock()
@@ -66,19 +63,18 @@ class MapWithLockAndTimeout(dict):
     def __getitem__(self, item):
         with self.lock:
             ret = dict.__getitem__(self, item)
-            return ret['data']
+            return ret["data"]
 
     def __setitem__(self, item, value):
         with self.lock:
-            dict.__setitem__(self, item, {'time_stamp': datetime.datetime.utcnow(),
-                                          'data': value})
+            dict.__setitem__(self, item, {"time_stamp": datetime.datetime.utcnow(), "data": value})
 
     # check data by taking freshness into account
     def __contains__(self, item):
         with self.lock:
             try:
                 ret = dict.__getitem__(self, item)
-                if ret['time_stamp'] > datetime.datetime.utcnow() - datetime.timedelta(minutes=self.timeout):
+                if ret["time_stamp"] > datetime.datetime.utcnow() - datetime.timedelta(minutes=self.timeout):
                     return True
             except Exception:
                 pass
@@ -87,7 +83,6 @@ class MapWithLockAndTimeout(dict):
 
 # weighted lists
 class WeightedLists(object):
-
     def __init__(self, lock):
         self.lock = multiprocessing.Lock()
         self.data = multiprocessing.Queue()
@@ -97,12 +92,12 @@ class WeightedLists(object):
 
     def __len__(self):
         with self.lock:
-            l = 0
+            len_data = 0
             data = self.data.get()
             for item in data:
-                l += len(data[item])
+                len_data += len(data[item])
             self.data.put(data)
-            return l
+            return len_data
 
     def add(self, weight, list_data):
         if not list_data or weight <= 0:
@@ -136,7 +131,6 @@ class WeightedLists(object):
 
 # lock pool
 class LockPool(object):
-
     def __init__(self, pool_size=100):
         self.pool_size = pool_size
         self.lock = multiprocessing.Lock()

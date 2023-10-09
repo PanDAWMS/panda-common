@@ -1,26 +1,32 @@
+import re
 import sys
+
 from pandacommon.liveconfigparser.LiveConfigParser import LiveConfigParser
 
 
 # expand config parameters to module attributes
-def expandConfig(configFileName,sectionName,moduleName):
+def expandConfig(config_file_name, section_name, module_name):
     try:
         # get ConfigParser
-        tmpConf = LiveConfigParser()
+        tmp_conf = LiveConfigParser()
+
         # read config file
-        tmpConf.read(configFileName)
+        tmp_conf.read(config_file_name)
+
         # get section
-        tmpDict = getattr(tmpConf,sectionName)
-        tmpSelf = sys.modules[moduleName]
-        for tmpKey,tmpVal in tmpDict.iteritems():
+        tmp_dict = getattr(tmp_conf, section_name)
+        tmp_self = sys.modules[module_name]
+
+        for tmp_key, tmp_val in tmp_dict.iteritems():
             # convert string to bool/int
-            if tmpVal == 'True':
-                tmpVal = True
-            elif tmpVal == 'False':
-                tmpVal = False
-            elif re.match('^\d+$',tmpVal):
-                tmpVal = int(tmpVal)
+            if tmp_val == "True":
+                tmp_val = True
+            elif tmp_val == "False":
+                tmp_val = False
+            elif re.match("^\d+$", tmp_val):
+                tmp_val = int(tmp_val)
+
             # update dict
-            tmpSelf.__dict__[tmpKey] = tmpVal
+            tmp_self.__dict__[tmp_key] = tmp_val
     except Exception:
         pass

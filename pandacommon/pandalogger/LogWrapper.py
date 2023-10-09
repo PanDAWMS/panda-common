@@ -1,147 +1,144 @@
-import resource
 import datetime
+import resource
+
 from .PandaLogger import PandaLogger
 
 
 # wrapper to set prefix to logging messages
 class LogWrapper:
-    def __init__(self,log,prefix='',lineLimit=100,monToken=None,seeMem=False,hook=None):
+    def __init__(self, log, prefix="", lineLimit=100, monToken=None, seeMem=False, hook=None):
         # use timestamp as prefix
         if prefix is None:
-            self.prefix = datetime.datetime.utcnow().isoformat('/')
+            self.prefix = datetime.datetime.utcnow().isoformat("/")
         else:
             self.prefix = prefix
         # logger instance
         self.logger = log
         # message buffer
-        self.msgBuffer = []
-        self.lineLimit = lineLimit
+        self.msg_buffer = []
+        self.line_limit = lineLimit
         # token for monitor
         if monToken is not None:
-            self.monToken = monToken
+            self.mon_token = monToken
         else:
-            self.monToken = self.prefix
-        self.seeMem = seeMem
+            self.mon_token = self.prefix
+        self.see_mem = seeMem
         self.hook = hook
         try:
-            self.name = self.logger.name.split('.')[-1]
+            self.name = self.logger.name.split(".")[-1]
         except Exception:
-            self.name = ''
-
+            self.name = ""
 
     # get memory usage
     def getMemoryUsage(self):
-        return ' (mem usage {0} MB)'.format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024)
+        return " (mem usage {0} MB)".format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024)
 
-
-    def keepMsg(self,msg):
+    def keepMsg(self, msg):
         # keep max message depth
-        if len(self.msgBuffer) > self.lineLimit:
-            self.msgBuffer.pop(0)
+        if len(self.msg_buffer) > self.line_limit:
+            self.msg_buffer.pop(0)
         timeNow = datetime.datetime.utcnow()
-        self.msgBuffer.append('{0} : {1}'.format(timeNow.isoformat(' '),msg))
+        self.msg_buffer.append("{0} : {1}".format(timeNow.isoformat(" "), msg))
 
-
-    def debug(self,msg):
+    def debug(self, msg):
         msg = str(msg)
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'DEBUG', self.name, self.prefix)
+                self.hook.add_dialog_message(msg, "DEBUG", self.name, self.prefix)
         except Exception:
             pass
-        if self.prefix != '':
-            msg = self.prefix + ' ' + str(msg)
-        if self.seeMem:
+        if self.prefix != "":
+            msg = self.prefix + " " + str(msg)
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.debug(msg)
 
-    def info(self,msg):
+    def info(self, msg):
         msg = str(msg)
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'INFO', self.name, self.prefix)
+                self.hook.add_dialog_message(msg, "INFO", self.name, self.prefix)
         except Exception:
             pass
-        if self.prefix != '':
-            msg = self.prefix + ' ' + str(msg)
-        if self.seeMem:
+        if self.prefix != "":
+            msg = self.prefix + " " + str(msg)
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.info(msg)
 
-    def error(self,msg):
+    def error(self, msg):
         msg = str(msg)
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'ERROR', self.name, self.prefix)
+                self.hook.add_dialog_message(msg, "ERROR", self.name, self.prefix)
         except Exception:
             pass
-        if self.prefix != '':
-            msg = self.prefix + ' ' + str(msg)
-        if self.seeMem:
+        if self.prefix != "":
+            msg = self.prefix + " " + str(msg)
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.error(msg)
 
-    def warning(self,msg):
+    def warning(self, msg):
         msg = str(msg)
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'WARNING', self.name, self.prefix)
+                self.hook.add_dialog_message(msg, "WARNING", self.name, self.prefix)
         except Exception:
             pass
-        if self.prefix != '':
-            msg = self.prefix + ' ' + str(msg)
-        if self.seeMem:
+        if self.prefix != "":
+            msg = self.prefix + " " + str(msg)
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.warning(msg)
 
-    def critical(self,msg):
+    def critical(self, msg):
         msg = str(msg)
         self.keepMsg(msg)
         try:
             if self.hook is not None:
-                self.hook.add_dialog_message(msg, 'CRITICAL', self.name, self.prefix)
+                self.hook.add_dialog_message(msg, "CRITICAL", self.name, self.prefix)
         except Exception:
             pass
-        if self.prefix != '':
-            msg = self.prefix + ' ' + str(msg)
-        if self.seeMem:
+        if self.prefix != "":
+            msg = self.prefix + " " + str(msg)
+        if self.see_mem:
             msg += self.getMemoryUsage()
         self.logger.critical(msg)
 
     def dumpToString(self):
-        strMsg = ''
-        for msg in self.msgBuffer:
-            strMsg += msg
-            strMsg += "\n"
-        return strMsg
-
+        str_msg = ""
+        for msg in self.msg_buffer:
+            str_msg += msg
+            str_msg += "\n"
+        return str_msg
 
     # send message to logger
-    def sendMsg(self,message,loggerName,msgType,msgLevel='info'):
+    def sendMsg(self, message, logger_name, msg_type, msgLevel="info"):
         try:
             # get logger
-            tmpPandaLogger = PandaLogger()
+            tmp_panda_logger = PandaLogger()
             # lock HTTP handler
-            tmpPandaLogger.lock()
-            tmpPandaLogger.setParams({'Type':msgType})
+            tmp_panda_logger.lock()
+            tmp_panda_logger.setParams({"Type": msg_type})
             # get logger
-            tmpLogger = tmpPandaLogger.getHttpLogger(loggerName)
+            tmp_logger = tmp_panda_logger.getHttpLogger(logger_name)
             # add message
-            message = self.monToken + ' ' + message
-            if msgLevel=='error':
-                tmpLogger.error(message)
-            elif msgLevel=='warning':
-                tmpLogger.warning(message)
-            elif msgLevel=='info':
-                tmpLogger.info(message)
+            message = self.mon_token + " " + message
+            if msgLevel == "error":
+                tmp_logger.error(message)
+            elif msgLevel == "warning":
+                tmp_logger.warning(message)
+            elif msgLevel == "info":
+                tmp_logger.info(message)
             else:
-                tmpLogger.debug(message)
+                tmp_logger.debug(message)
         except Exception:
             pass
         finally:
             # release HTTP handler
-            tmpPandaLogger.release()
+            tmp_panda_logger.release()

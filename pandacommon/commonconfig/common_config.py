@@ -1,10 +1,12 @@
+"""Common configuration file for all panda modules"""
+
 from ..liveconfigparser.LiveConfigParser import LiveConfigParser
 
 # get ConfigParser
 tmpConf = LiveConfigParser()
 
 # read
-tmpConf.read('panda_common.cfg')
+tmpConf.read("panda_common.cfg")
 
 
 # get section

@@ -1,10 +1,11 @@
 import sys
 import traceback
 import inspect
+import sys
+import traceback
 
-from .PandaLogger import PandaLogger
 from .LogWrapper import LogWrapper
-
+from .PandaLogger import PandaLogger
 
 # global memory profiling option
 with_memory_profile = False
@@ -22,8 +23,10 @@ def setup_logger(name=None, log_level=None):
         frm = inspect.stack()[1][0]
         mod = inspect.getmodule(frm)
         name = mod.__name__.split('.')[-1]
+
     if log_level:
         return PandaLogger().getLogger(name, log_level=log_level)
+
     return PandaLogger().getLogger(name)
 
 
@@ -31,27 +34,29 @@ def setup_logger(name=None, log_level=None):
 def make_logger(tmp_log, token=None, method_name=None, hook=None):
     # get method name of caller
     if method_name is None:
-        tmpStr = inspect.stack()[1][3]
+        tmp_str = inspect.stack()[1][3]
     else:
-        tmpStr = method_name
+        tmp_str = method_name
+
     if token is not None:
-        tmpStr += ' <{0}>'.format(token)
+        tmp_str += " <{0}>".format(token)
     else:
-        tmpStr += ' :'
-    newLog = LogWrapper(tmp_log, tmpStr, seeMem=with_memory_profile, hook=hook)
-    return newLog
+        tmp_str += " :"
+
+    new_log = LogWrapper(tmp_log, tmp_str, seeMem=with_memory_profile, hook=hook)
+    return new_log
 
 
 # dump error message
 def dump_error_message(tmp_log, err_str=None, no_message=False):
     if not isinstance(tmp_log, LogWrapper):
-        methodName = '{0} : '.format(inspect.stack()[1][3])
+        method_name = "{0} : ".format(inspect.stack()[1][3])
     else:
-        methodName = ''
+        method_name = ""
     # error
     if err_str is None:
-        errtype, errvalue = sys.exc_info()[:2]
-        err_str = "{0} {1} {2} ".format(methodName, errtype.__name__, errvalue)
+        err_type, err_value = sys.exc_info()[:2]
+        err_str = "{0} {1} {2} ".format(method_name, err_type.__name__, err_value)
         err_str += traceback.format_exc()
     if not no_message:
         tmp_log.error(err_str)
