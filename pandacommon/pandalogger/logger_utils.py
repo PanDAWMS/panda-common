@@ -1,3 +1,5 @@
+import sys
+import traceback
 import inspect
 import sys
 import traceback
@@ -16,16 +18,15 @@ def enable_memory_profiling():
 
 
 # setup logger
-def setup_logger(name=None):
+def setup_logger(name=None, log_level=None):
     if name is None:
         frm = inspect.stack()[1][0]
         mod = inspect.getmodule(frm)
-        name = mod.__name__.split(".")[-1]
-    try:
-        log_level = getattr(harvester_config.log_level, name)
+        name = mod.__name__.split('.')[-1]
+
+    if log_level:
         return PandaLogger().getLogger(name, log_level=log_level)
-    except Exception:
-        pass
+
     return PandaLogger().getLogger(name)
 
 
