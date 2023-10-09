@@ -37,10 +37,12 @@ def make_logger(tmp_log, token=None, method_name=None, hook=None):
         tmp_str = inspect.stack()[1][3]
     else:
         tmp_str = method_name
+
     if token is not None:
         tmp_str += " <{0}>".format(token)
     else:
         tmp_str += " :"
+
     new_log = LogWrapper(tmp_log, tmp_str, seeMem=with_memory_profile, hook=hook)
     return new_log
 
