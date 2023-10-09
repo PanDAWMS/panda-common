@@ -6,7 +6,7 @@ from .PandaLogger import PandaLogger
 
 # wrapper to set prefix to logging messages
 class LogWrapper:
-    def __init__(self, log, prefix="", line_limit=100, monToken=None, seeMem=False, hook=None):
+    def __init__(self, log, prefix="", lineLimit=100, monToken=None, seeMem=False, hook=None):
         # use timestamp as prefix
         if prefix is None:
             self.prefix = datetime.datetime.utcnow().isoformat("/")
@@ -16,7 +16,7 @@ class LogWrapper:
         self.logger = log
         # message buffer
         self.msg_buffer = []
-        self.line_limit = line_limit
+        self.line_limit = lineLimit
         # token for monitor
         if monToken is not None:
             self.mon_token = monToken
