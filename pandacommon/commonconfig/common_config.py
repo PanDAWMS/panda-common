@@ -1,3 +1,5 @@
+"""Common configuration file for all panda modules"""
+
 from ..liveconfigparser.LiveConfigParser import LiveConfigParser
 
 # get ConfigParser
