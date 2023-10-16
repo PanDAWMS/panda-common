@@ -1,5 +1,3 @@
-import sys
-import traceback
 import inspect
 import sys
 import traceback
@@ -22,7 +20,7 @@ def setup_logger(name=None, log_level=None):
     if name is None:
         frm = inspect.stack()[1][0]
         mod = inspect.getmodule(frm)
-        name = mod.__name__.split('.')[-1]
+        name = mod.__name__.split(".")[-1]
 
     if log_level:
         return PandaLogger().getLogger(name, log_level=log_level)

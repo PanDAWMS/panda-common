@@ -1,8 +1,8 @@
-from hatchling.builders.hooks.plugin.interface import BuildHookInterface
-
+import glob
 import os
 import stat
-import glob
+
+from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 
 class CustomBuildHook(BuildHookInterface):
