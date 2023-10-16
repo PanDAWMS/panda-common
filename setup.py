@@ -11,9 +11,8 @@ sys.path.insert(0, ".")  # noqa: E402
 import os
 
 import PandaPkgInfo
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 from setuptools.command.install import install as install_org
-
 
 # get release version
 release_version = PandaPkgInfo.release_version

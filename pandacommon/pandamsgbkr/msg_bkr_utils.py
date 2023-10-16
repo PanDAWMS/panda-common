@@ -17,7 +17,6 @@ except ImportError:
     from Queue import Empty, Queue
 
 import stomp
-
 from pandacommon.pandalogger import logger_utils
 
 # logger
