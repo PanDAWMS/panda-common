@@ -489,8 +489,9 @@ class MBListenerProxy(MBProxyBase):
                             time.sleep(0.003)
                             if self.got_connected:
                                 break
+                        self.logger.debug(f"connected to {conn_id}, subscribing...")
                         conn.subscribe(destination=self.destination, id=self.sub_id, ack=self.ack_mode, headers=self.subscription_headers)
-                        self.logger.info("connected to {0} {1}".format(conn_id, self.destination))
+                        self.logger.info(f"connected to {conn_id} and subscribed {self.destination}")
                 else:
                     self.logger.info("connection to {0} {1} already exists. Skipped...".format(conn_id, self.destination))
             except Exception as e:
@@ -678,12 +679,13 @@ class MBSenderProxy(MBProxyBase):
                         time.sleep(0.003)
                         if self.got_connected:
                             break
+                    self.logger.debug(f"connected to {self.conn_id}, subscribing...")
                     # add removers
                     with self.remover_lock:
                         for r_id in self.removers:
                             headers = self.removers[r_id]["headers"]
                             self.conn.subscribe(destination=self.destination, headers=headers, id=r_id, ack="auto")
-                    self.logger.info("connected to {0} {1}".format(self.conn_id, self.destination))
+                    self.logger.info(f"connected to {self.conn_id} and subscribed {self.destination}")
             else:
                 self.logger.info("connection to {0} {1} already exists. Skipped...".format(self.conn_id, self.destination))
         except Exception as e:
