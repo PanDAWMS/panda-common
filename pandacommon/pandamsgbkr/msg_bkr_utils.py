@@ -486,9 +486,9 @@ class MBListenerProxy(MBProxyBase):
                         conn.connect(**self.connect_params)
                         # wait for on_connected done for a while before subscribe
                         for wait_i in range(100):
-                            time.sleep(0.003)
                             if self.got_connected:
                                 break
+                            time.sleep(0.003)
                         self.logger.debug(f"connected to {conn_id}, subscribing...")
                         conn.subscribe(destination=self.destination, id=self.sub_id, ack=self.ack_mode, headers=self.subscription_headers)
                         self.logger.info(f"connected to {conn_id} and subscribed {self.destination}")
@@ -676,9 +676,9 @@ class MBSenderProxy(MBProxyBase):
                     self.conn.connect(**self.connect_params)
                     # wait for on_connected done for a while before subscribe
                     for wait_i in range(100):
-                        time.sleep(0.003)
                         if self.got_connected:
                             break
+                        time.sleep(0.003)
                     self.logger.debug(f"connected to {self.conn_id}, subscribing...")
                     # add removers
                     with self.remover_lock:
