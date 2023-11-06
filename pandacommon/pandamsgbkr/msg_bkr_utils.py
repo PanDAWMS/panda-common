@@ -679,13 +679,13 @@ class MBSenderProxy(MBProxyBase):
                         if self.got_connected:
                             break
                         time.sleep(0.003)
-                    self.logger.debug(f"connected to {self.conn_id}, subscribing...")
+                    self.logger.debug(f"connected to {self.conn_id}")
                     # add removers
                     with self.remover_lock:
                         for r_id in self.removers:
                             headers = self.removers[r_id]["headers"]
                             self.conn.subscribe(destination=self.destination, headers=headers, id=r_id, ack="auto")
-                    self.logger.info(f"connected to {self.conn_id} and subscribed {self.destination}")
+                    self.logger.info(f"connected to {self.conn_id} and ready to send to {self.destination}")
             else:
                 self.logger.info("connection to {0} {1} already exists. Skipped...".format(self.conn_id, self.destination))
         except Exception as e:
