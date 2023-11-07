@@ -243,6 +243,10 @@ class MsgListener(stomp.ConnectionListener):
 
 # message broker proxy base
 class MBProxyBase:
+    """
+    Base MBProxy class
+    """
+
     def is_connected_to_rabbitmq(self):
         return getattr(self, "mq_server", None) and self.mq_server.startswith("RabbitMQ/")
 
@@ -256,6 +260,8 @@ class MBProxyBase:
                 self.destination = re.sub(r"^/queue/", "/amq/queue/", self.orig_destination)
                 self.new_destination = self.destination
                 self.logger.debug(f"_on_connected : connected RabbitMQ; modified destination into {self.destination}")
+        # done
+        self.got_connected = True
 
     def _on_disconnected(self, conn_id):
         self.logger.debug("_on_disconnected from {c} called".format(c=conn_id))
@@ -351,6 +357,8 @@ class MBListenerProxy(MBProxyBase):
         self.dump_msgs = []
         # number of attempts to restart
         self.n_restart = 0
+        # whether got connected from on_connected
+        self.got_connected = False
         # whether got disconnected from on_disconnected
         self.got_disconnected = False
         # whether to disconnect intentionally
@@ -476,8 +484,14 @@ class MBListenerProxy(MBProxyBase):
                     conn.set_listener(listener.__class__.__name__, listener)
                     with self.dest_lock:
                         conn.connect(**self.connect_params)
+                        # wait for on_connected done for a while before subscribe
+                        for wait_i in range(100):
+                            if self.got_connected:
+                                break
+                            time.sleep(0.003)
+                        self.logger.debug(f"connected to {conn_id}, subscribing...")
                         conn.subscribe(destination=self.destination, id=self.sub_id, ack=self.ack_mode, headers=self.subscription_headers)
-                        self.logger.info("connected to {0} {1}".format(conn_id, self.destination))
+                        self.logger.info(f"connected to {conn_id} and subscribed {self.destination}")
                 else:
                     self.logger.info("connection to {0} {1} already exists. Skipped...".format(conn_id, self.destination))
             except Exception as e:
@@ -492,6 +506,7 @@ class MBListenerProxy(MBProxyBase):
         for conn_id, conn in self.connection_dict.items():
             conn.disconnect()
             self.logger.info("disconnect from {0} {1}".format(conn_id, self.destination))
+        self.got_connected = False
         self.logger.info("done")
 
     def restart(self):
@@ -573,6 +588,8 @@ class MBSenderProxy(MBProxyBase):
         self.connect_params = {"username": username, "passcode": passcode, "wait": wait, "headers": {"client-id": self.client_id}}
         # number of attempts to restart
         self.n_restart = 0
+        # whether got connected from on_connected
+        self.got_connected = False
         # whether got disconnected from on_disconnected
         self.got_disconnected = False
         # whether to disconnect intentionally
@@ -657,12 +674,18 @@ class MBSenderProxy(MBProxyBase):
                 self.conn.set_listener(self.listener.__class__.__name__, self.listener)
                 with self.dest_lock:
                     self.conn.connect(**self.connect_params)
+                    # wait for on_connected done for a while before subscribe
+                    for wait_i in range(100):
+                        if self.got_connected:
+                            break
+                        time.sleep(0.003)
+                    self.logger.debug(f"connected to {self.conn_id}")
                     # add removers
                     with self.remover_lock:
                         for r_id in self.removers:
                             headers = self.removers[r_id]["headers"]
                             self.conn.subscribe(destination=self.destination, headers=headers, id=r_id, ack="auto")
-                    self.logger.info("connected to {0} {1}".format(self.conn_id, self.destination))
+                    self.logger.info(f"connected to {self.conn_id} and ready to send to {self.destination}")
             else:
                 self.logger.info("connection to {0} {1} already exists. Skipped...".format(self.conn_id, self.destination))
         except Exception as e:
@@ -674,6 +697,7 @@ class MBSenderProxy(MBProxyBase):
         self.logger.debug("stop called")
         self.to_disconnect = True
         self.conn.disconnect()
+        self.got_connected = False
         self.logger.info("disconnect from {0} {1}".format(self.conn_id, self.destination))
 
     def restart(self):
