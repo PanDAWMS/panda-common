@@ -9,7 +9,7 @@ class LogWrapper:
     def __init__(self, log, prefix="", lineLimit=100, monToken=None, seeMem=False, hook=None):
         # use timestamp as prefix
         if prefix is None:
-            self.prefix = datetime.datetime.utcnow().isoformat("/")
+            self.prefix = datetime.datetime.now(datetime.UTC).isoformat("/")
         else:
             self.prefix = prefix
         # logger instance
@@ -37,7 +37,7 @@ class LogWrapper:
         # keep max message depth
         if len(self.msg_buffer) > self.line_limit:
             self.msg_buffer.pop(0)
-        timeNow = datetime.datetime.utcnow()
+        timeNow = datetime.datetime.now(datetime.UTC)
         self.msg_buffer.append("{0} : {1}".format(timeNow.isoformat(" "), msg))
 
     def debug(self, msg):
