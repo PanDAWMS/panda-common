@@ -1,6 +1,9 @@
 Release Notes
 -------------
 
+* current
+  * utcnow() -> now(UTC)
+
 * 0.0.45 (09/10/2023)
   * Autoformatting, linting and adding pre-commit configuration
 
