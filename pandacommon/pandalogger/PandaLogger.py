@@ -126,12 +126,7 @@ class _PandaHTTPLogHandler(logging.Handler):
         else:
             self.my_semaphore = threading.Semaphore(10)
         # parameters
-        self.params = {
-            "PandaID": -1,
-            "User": "unknown",
-            "Type": "unknown",
-            "ID": "tester"
-        }
+        self.params = {"PandaID": -1, "User": "unknown", "Type": "unknown", "ID": "tester"}
 
     def mapLogRecord(self, record):
         """
@@ -269,13 +264,7 @@ class PandaLogger:
     """
 
     def __init__(self, pid=0, user="", id="", type=""):
-        self.params = {
-            "PandaID": pid,
-            "ID": id,
-            "User": user,
-            "Type": type
-        }
-
+        self.params = {"PandaID": pid, "ID": id, "User": user, "Type": type}
 
     def getLogger(self, log_name, log_level=None):
         log_h, new_log_flag = getLoggerWrapper("panda.log.%s" % log_name, True)
@@ -317,7 +306,9 @@ class PandaLogger:
             else:
                 backup_count = 1
             # handler with rotating based on size
-            txt_handler = logging.handlers.RotatingFileHandler("%s/panda-%s.log" % (logger_config.daemon["logdir"], log_name), maxBytes=max_size, backupCount=backup_count)
+            txt_handler = logging.handlers.RotatingFileHandler(
+                "%s/panda-%s.log" % (logger_config.daemon["logdir"], log_name), maxBytes=max_size, backupCount=backup_count
+            )
             if new_log_flag and rotateLog:
                 txt_handler.doRollover()
         else:
