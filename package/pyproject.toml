@@ -7,8 +7,8 @@ build-backend = "hatchling.build"
 name = "panda-common"
 dynamic = ["version"]
 description = " PanDA Common Package"
-readme = "README.txt"
-license = "Apache-2.0"
+readme = "README.md"
+license = {text = "Apache-2.0"}
 authors = [
     { name = "PanDA Team", email = "panda-support@cern.ch" },
 ]
