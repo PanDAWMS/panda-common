@@ -17,7 +17,6 @@ except ImportError:
     from Queue import Empty, Queue
 
 import stomp
-
 from pandacommon.pandalogger import logger_utils
 
 # logger
@@ -720,7 +719,7 @@ class MBSenderProxy(MBProxyBase):
         # unique id for each remover
         r_id = self.sub_id + "." + str(uuid.uuid4())
         with self.remover_lock:
-            self.removers[r_id] = {"timeout": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=timeout), "headers": copy.copy(headers)}
+            self.removers[r_id] = {"timeout": datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout), "headers": copy.copy(headers)}
         # reconnect if necessary
         if self.got_disconnected:
             self.restart()
@@ -734,7 +733,7 @@ class MBSenderProxy(MBProxyBase):
         """
         self.logger.debug("purging old removers")
         with self.remover_lock:
-            time_now = datetime.datetime.now(datetime.timezone.utc)
+            time_now = datetime.datetime.utcnow()
             n_old = len(self.removers)
             for r_id in list(self.removers):
                 timeout = self.removers[r_id]["timeout"]
