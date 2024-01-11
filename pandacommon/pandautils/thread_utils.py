@@ -67,14 +67,14 @@ class MapWithLockAndTimeout(dict):
 
     def __setitem__(self, item, value):
         with self.lock:
-            dict.__setitem__(self, item, {"time_stamp": datetime.datetime.utcnow(), "data": value})
+            dict.__setitem__(self, item, {"time_stamp": datetime.datetime.now(datetime.timezone.utc), "data": value})
 
     # check data by taking freshness into account
     def __contains__(self, item):
         with self.lock:
             try:
                 ret = dict.__getitem__(self, item)
-                if ret["time_stamp"] > datetime.datetime.utcnow() - datetime.timedelta(minutes=self.timeout):
+                if ret["time_stamp"] > datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=self.timeout):
                     return True
             except Exception:
                 pass
