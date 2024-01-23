@@ -18,7 +18,7 @@ dependencies = [
     "requests",
     "stomp.py >=4.1.23, <=7.0.0",
 ]
-
+requires-python = ">=3.8"
 
 [project.urls]
 Homepage = "https://panda-wms.readthedocs.io/en/latest/"

@@ -1,8 +1,8 @@
 Release Notes
 -------------
 
-* current
-  * utcnow() -> now(UTC)
+* 0.1.0 (23/1/2024)
+  * utcnow() -> datetime.now(datetime.timezone.utc).replace(tzinfo=None)
   * PEP517
 
 * 0.0.45 (09/10/2023)
