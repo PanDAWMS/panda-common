@@ -63,7 +63,7 @@ def get_mb_proxy(name, sconf, qconf, mode="listener", **kwargs):
         max_buffer_len=qconf.get("max_buffer_len", 999),
         buffer_block_sec=qconf.get("buffer_block_sec", 10),
         use_transaction=qconf.get("use_transaction", True),
-        verbose=sconf.get("verbose", False),
+        verbose=sconf.get("verbose", False) or qconf.get("verbose", False),
         **kwargs
     )
     return mb_proxy
@@ -264,7 +264,7 @@ class MsgProcAgentBase(GenericThread):
                     'username': 'someuser',
                     'passcode': 'xxxxyyyyzzzz',
                     'vhost': '/somehost',
-                    'verbose': True,
+                    'verbose': False,
                 },
                 ...
             }
@@ -273,6 +273,7 @@ class MsgProcAgentBase(GenericThread):
                     'enable': True,
                     'server': 'Server_1',
                     'destination': '/queue/some_queue',
+                    'verbose': True,
                 },
                 ...
             }
@@ -284,7 +285,6 @@ class MsgProcAgentBase(GenericThread):
                     'n_threads': 1,
                     'in_queue': 'Queue_1',
                     'out_queue': 'Queue_2',
-                    'verbose': True,
                 },
                 ...
             }
