@@ -16,7 +16,7 @@ dependencies = [
     "configparser",
     "pytz",
     "requests",
-    "stomp.py >=4.1.23, <=7.0.0",
+    "stomp.py >=8.1.2",
 ]
 requires-python = ">=3.8"
 
