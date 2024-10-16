@@ -23,6 +23,19 @@ from pandacommon.pandalogger import logger_utils
 # logger
 base_logger = logger_utils.setup_logger("msg_bkr_utils")
 
+# adjust stomp logger
+stomp_log_level = "INFO"
+panda_stomp_logger = logger_utils.setup_logger("stomp.py")
+stomp_logger = stomp.logging.__logger
+for handler in stomp_logger.handlers.copy():
+    handler.close()
+    stomp_logger.removeHandler(handler)
+for handler in panda_stomp_logger.handlers.copy():
+    handler.setLevel(stomp_log_level)
+    stomp_logger.addHandler(handler)
+stomp_logger.setLevel(stomp_log_level)
+stomp_logger.propagate = False
+
 # global lock
 _GLOBAL_LOCK = threading.Lock()
 
