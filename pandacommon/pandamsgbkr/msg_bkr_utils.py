@@ -23,6 +23,19 @@ from pandacommon.pandalogger import logger_utils
 # logger
 base_logger = logger_utils.setup_logger("msg_bkr_utils")
 
+# adjust stomp logger
+stomp_log_level = "INFO"
+panda_stomp_logger = logger_utils.setup_logger("stomp.py")
+stomp_logger = stomp.logging.__logger
+for handler in stomp_logger.handlers.copy():
+    handler.close()
+    stomp_logger.removeHandler(handler)
+for handler in panda_stomp_logger.handlers.copy():
+    handler.setLevel(stomp_log_level)
+    stomp_logger.addHandler(handler)
+stomp_logger.setLevel(stomp_log_level)
+stomp_logger.propagate = False
+
 # global lock
 _GLOBAL_LOCK = threading.Lock()
 
@@ -150,7 +163,7 @@ class MsgObj(object):
     def __enter__(self):
         # self.__mb_proxy.logger.debug('msg_id={m} MsgObj.__enter__ called'.format(m=self.msg_id))
         if self.is_transacted:
-            # transcation ID
+            # transaction ID
             self.txs_id = self.__mb_proxy._begin(self.conn_id)
         return self
 
@@ -183,7 +196,7 @@ class MsgListener(stomp.ConnectionListener):
         # logger
         _token = "{0}-{1}".format(mb_proxy.__class__.__name__, mb_proxy.name)
         self.logger = logger_utils.make_logger(base_logger, token=_token, method_name="MsgListener")
-        # associated messgage broker proxy
+        # associated message broker proxy
         self.mb_proxy = mb_proxy
         # connection id
         self.conn_id = conn_id
@@ -344,7 +357,7 @@ class MBListenerProxy(MBProxyBase):
         self.max_buffer_len = max_buffer_len
         # put retry period in seconds to wait for blocking
         self.buffer_block_sec = buffer_block_sec
-        # whether to enable trancastion of message broker to wrap the message processing
+        # whether to enable transaction of message broker to wrap the message processing
         self.use_transaction = use_transaction
         # connection mode; "all" or "any"
         self.conn_mode = conn_mode

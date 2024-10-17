@@ -75,15 +75,15 @@ class SimpleMsgProcPluginBase:
     Base class of simple message processor plugin
     Simple message processor suits following cases:
         - one-out: to create a messages and send them to one queue
-        - one-in: to receive messages from one queue and proceess the messages
-        - one-in-one-out: to receive messages from one queue, proceess the messages to create new messages, and then and send new messages to another queue
+        - one-in: to receive messages from one queue and processes the messages
+        - one-in-one-out: to receive messages from one queue, processes the messages to create new messages, and then and send new messages to another queue
     """
 
     def __init__(self, **params):
         """
         Low level initialization called by plugin factory
         The dict of params configured is passed to self.params
-        Do NOT overwrite __init__ for intitialization. Instead, overwrite initialize(self) function
+        Do NOT overwrite __init__ for initialization. Instead, overwrite initialize(self) function
         """
         self.params = params
 
@@ -112,14 +112,44 @@ class SimpleMsgProcPluginBase:
         return GenericThread().get_pid(current=True)
 
 
-# muti-message processor plugin Base
+# multi-message processor plugin Base
 class MultiMsgProcPluginBase:
     """
     Base class of multi-message processor plugin
     For multi-in-multi-out message processor thread
     """
 
-    # TODO
+    def __init__(self, **params):
+        """
+        Low level initialization called by plugin factory
+        The dict of params configured is passed to self.params
+        Do NOT overwrite __init__ for initialization. Instead, overwrite initialize(self) function
+        """
+        self.params = params
+
+    def initialize(self):
+        """
+        initialize plugin instance, run once before loop in thread
+        """
+
+    def terminate(self):
+        """
+        terminate plugin instance, run before stopping the thread
+        """
+
+    def process(self, msg_obj):
+        """
+        process the message
+        Get msg_obj from the incoming MQ (if any; otherwise msg_obj is None)
+        Returned value will be sent to the outgoing MQ (if any)
+        """
+        raise NotImplementedError
+
+    def get_pid(self):
+        """
+        get generic pid, including hostname, os process id, thread id
+        """
+        return GenericThread().get_pid(current=True)
 
 
 # simple message processor thread
@@ -218,7 +248,93 @@ class MultiMsgProcThread(GenericThread):
     Thread of multi-message processor of certain plugin
     """
 
-    # TODO
+    def __init__(self, plugin, attr_dict, sleep_time_min, sleep_time_max, thread_j):
+        GenericThread.__init__(self)
+        self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="MultiMsgProcThread.__init__")
+        self.__to_run = True
+        self.plugin = plugin
+        self.in_queue_list = attr_dict.get("in_queue_list")
+        self.mb_sender_proxy_list = attr_dict.get("mb_sender_proxy_list")
+        self.sleep_time_min = sleep_time_min
+        self.sleep_time_max = sleep_time_max
+        self.thread_j = thread_j
+        self.verbose = attr_dict.get("verbose", False)
+
+    def run(self):
+        # update logger thread id
+        self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="MultiMsgProcThread")
+        # start
+        self.logger.info("start run")
+        # initialization step of plugin
+        self.logger.info("plugin initialize")
+        self.plugin.initialize()
+        # message buffers
+        self.logger.info(f"message buffers are {self.in_queue_list}")
+        self.msg_buffer_map = {}
+        for in_queue in self.in_queue_list:
+            msg_buffer = MsgBuffer(queue_name=in_queue)
+            self.msg_buffer_map[in_queue] = msg_buffer
+        # main loop
+        self.logger.info("start loop")
+        while self.__to_run:
+            is_processed = False
+            proc_ret = None
+            # as consumer
+            if self.msg_buffer_map:
+                for in_queue, msg_buffer in msg_buffer_map.items():
+                    # get from buffer
+                    msg_obj = msg_buffer.get()
+                    if msg_obj is not None:
+                        if self.verbose:
+                            self.logger.debug(f"received a new message from {in_queue}")
+                            self.logger.debug("plugin process start")
+                        try:
+                            with msg_obj as _msg_obj:
+                                proc_ret = self.plugin.process(_msg_obj)
+                            is_processed = True
+                            if self.verbose:
+                                self.logger.debug("successfully processed")
+                        except Exception as e:
+                            self.logger.error("error when process message msg_id={0} with {1}: {2} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                        if self.verbose:
+                            self.logger.debug("plugin process end")
+            else:
+                if self.verbose:
+                    self.logger.debug("plugin process start")
+                try:
+                    proc_ret = self.plugin.process(None)
+                    is_processed = True
+                    if self.verbose:
+                        self.logger.debug("successfully processed")
+                except Exception as e:
+                    self.logger.error("error when process with {0}: {1} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                if self.verbose:
+                    self.logger.debug("plugin process end")
+            # as producer
+            if self.mb_sender_proxy_list and is_processed:
+                for mb_sender_proxy in mb_sender_proxy_list:
+                    self.mb_sender_proxy.send(proc_ret)
+                    if self.verbose:
+                        self.logger.debug(f"sent a processed message to {mb_sender_proxy.name}")
+            # sleep
+            if is_processed:
+                time.sleep(self.sleep_time_min)
+            else:
+                time.sleep(self.sleep_time_max)
+        # stop loop
+        self.logger.info("stopped loop")
+        # tear down
+        # terminate plugin
+        self.logger.info("plugin terminate")
+        self.plugin.terminate()
+        self.logger.info("stopped run")
+
+    def stop(self):
+        """
+        send stop signal to this thread; will stop after current loop done
+        """
+        self.logger.debug("stop method called")
+        self.__to_run = False
 
 
 # message processing agent base
@@ -573,7 +689,7 @@ class MsgProcAgentBase(GenericThread):
 
     def start_passive_mode(self, in_q_list=None, out_q_list=None, prefetch_size=100):
         """
-        start passive mode: only spwan mb proxies (without spawning agent and plugin threads)
+        start passive mode: only spawn mb proxies (without spawning agent and plugin threads)
         in_q_list: list of inward queue name
         out_q_list: list of outward queue name
         prefetch_size: prefetch size of the message broker (can control number of un-acknowledged messages stored in the local buffer)

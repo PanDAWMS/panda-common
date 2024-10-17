@@ -31,3 +31,49 @@ def isLogRotating(before_limit, after_limit):
     if (time_now - time_cron) < datetime.timedelta(seconds=60 * after_limit) and (time_cron - time_now) < datetime.timedelta(seconds=60 * before_limit):
         return True
     return False
+
+
+def aware_utcnow() -> datetime:
+    """
+    Return the current UTC date and time, with tzinfo timezone.utc
+
+    Returns:
+        datetime: current UTC date and time, with tzinfo timezone.utc
+    """
+    return datetime.now(timezone.utc)
+
+
+def aware_utcfromtimestamp(timestamp: float) -> datetime:
+    """
+    Return the local date and time, with tzinfo timezone.utc, corresponding to the POSIX timestamp
+
+    Args:
+        timestamp (float): POSIX timestamp
+
+    Returns:
+        datetime: current UTC date and time, with tzinfo timezone.utc
+    """
+    return datetime.fromtimestamp(timestamp, timezone.utc)
+
+
+def naive_utcnow() -> datetime:
+    """
+    Return the current UTC date and time, without tzinfo
+
+    Returns:
+        datetime: current UTC date and time, without tzinfo
+    """
+    return aware_utcnow().replace(tzinfo=None)
+
+
+def naive_utcfromtimestamp(timestamp: float) -> datetime:
+    """
+    Return the local date and time, without tzinfo, corresponding to the POSIX timestamp
+
+    Args:
+        timestamp (float): POSIX timestamp
+
+    Returns:
+        datetime: current UTC date and time, without tzinfo
+    """
+    return aware_utcfromtimestamp(timestamp).replace(tzinfo=None)
