@@ -1,7 +1,12 @@
 import glob
+import json
 import os
+import re
+import socket
 import stat
+import subprocess
 
+import requests
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 PACKAGE_EMOJI = ":books:"
