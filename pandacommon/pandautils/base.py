@@ -71,7 +71,7 @@ class SpecBase(object):
 
     def pack(self, values):
         """
-        # pack tuple into spec
+        pack tuple into spec
         """
         for i in range(len(self.attributes)):
             attr = self.attributes[i]

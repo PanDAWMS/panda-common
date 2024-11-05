@@ -33,17 +33,17 @@ def isLogRotating(before_limit, after_limit):
     return False
 
 
-def aware_utcnow() -> datetime:
+def aware_utcnow() -> datetime.datetime.:
     """
     Return the current UTC date and time, with tzinfo timezone.utc
 
     Returns:
         datetime: current UTC date and time, with tzinfo timezone.utc
     """
-    return datetime.now(timezone.utc)
+    return datetime.datetime.now(timezone.utc)
 
 
-def aware_utcfromtimestamp(timestamp: float) -> datetime:
+def aware_utcfromtimestamp(timestamp: float) -> datetime.datetime:
     """
     Return the local date and time, with tzinfo timezone.utc, corresponding to the POSIX timestamp
 
@@ -53,10 +53,10 @@ def aware_utcfromtimestamp(timestamp: float) -> datetime:
     Returns:
         datetime: current UTC date and time, with tzinfo timezone.utc
     """
-    return datetime.fromtimestamp(timestamp, timezone.utc)
+    return datetime.datetime.fromtimestamp(timestamp, timezone.utc)
 
 
-def naive_utcnow() -> datetime:
+def naive_utcnow() -> datetime.datetime:
     """
     Return the current UTC date and time, without tzinfo
 
@@ -66,7 +66,7 @@ def naive_utcnow() -> datetime:
     return aware_utcnow().replace(tzinfo=None)
 
 
-def naive_utcfromtimestamp(timestamp: float) -> datetime:
+def naive_utcfromtimestamp(timestamp: float) -> datetime.datetime:
     """
     Return the local date and time, without tzinfo, corresponding to the POSIX timestamp
 
