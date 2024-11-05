@@ -33,7 +33,7 @@ def isLogRotating(before_limit, after_limit):
     return False
 
 
-def aware_utcnow() -> datetime.datetime.:
+def aware_utcnow() -> datetime.datetime:
     """
     Return the current UTC date and time, with tzinfo timezone.utc
 
