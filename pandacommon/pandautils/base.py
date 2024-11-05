@@ -13,6 +13,8 @@ class SpecBase(object):
     _zeroAttrs = ()
     # attributes to force update
     _forceUpdateAttrs = ()
+    # mapping between sequence and attr
+    _seqAttrMap = {}
 
     # constructor
     def __init__(self):
@@ -35,7 +37,7 @@ class SpecBase(object):
         """
         original setattr method
         """
-        super().__setattr__(self, name, value)
+        super().__setattr__(name, value)
 
     def resetChangedList(self):
         """
@@ -50,12 +52,15 @@ class SpecBase(object):
         if name in self.attributes:
             self._changedAttrs[name] = getattr(self, name)
 
-    def valuesMap(self, onlyChanged=False):
+    def valuesMap(self, useSeq=False, onlyChanged=False):
         """
         return map of values
         """
         ret = {}
         for attr in self.attributes:
+            # use sequence
+            if useSeq and attr in self._seqAttrMap:
+                continue
             # only changed attributes
             if onlyChanged:
                 if attr not in self._changedAttrs:
@@ -93,13 +98,16 @@ class SpecBase(object):
         return ret
 
     @classmethod
-    def bindValuesExpression(cls):
+    def bindValuesExpression(cls, useSeq=True):
         """
         return expression of bind variables for INSERT
         """
         attr_list = []
         for attr in cls.attributes:
-            attr_list.append(f":{attr}")
+            if useSeq and attr in cls._seqAttrMap:
+                attr_list.append(f"{cls._seqAttrMap[attr]}")
+            else:
+                attr_list.append(f":{attr}")
         attrs_str = ",".join(attr_list)
         ret = f"VALUES({attrs_str}) "
         return ret
