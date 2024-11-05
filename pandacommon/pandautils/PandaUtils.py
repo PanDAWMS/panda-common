@@ -40,7 +40,7 @@ def aware_utcnow() -> datetime.datetime:
     Returns:
         datetime: current UTC date and time, with tzinfo timezone.utc
     """
-    return datetime.datetime.now(timezone.utc)
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 def aware_utcfromtimestamp(timestamp: float) -> datetime.datetime:
@@ -53,7 +53,7 @@ def aware_utcfromtimestamp(timestamp: float) -> datetime.datetime:
     Returns:
         datetime: current UTC date and time, with tzinfo timezone.utc
     """
-    return datetime.datetime.fromtimestamp(timestamp, timezone.utc)
+    return datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
 
 
 def naive_utcnow() -> datetime.datetime:
