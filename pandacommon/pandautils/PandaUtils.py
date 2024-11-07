@@ -1,4 +1,5 @@
 import datetime
+import itertools
 
 import pytz
 
@@ -77,3 +78,18 @@ def naive_utcfromtimestamp(timestamp: float) -> datetime.datetime:
         datetime: current UTC date and time, without tzinfo
     """
     return aware_utcfromtimestamp(timestamp).replace(tzinfo=None)
+
+
+def batched(iterable, n, *, strict=False):
+    """
+    Batch data from the iterable into tuples of length n. The last batch may be shorter than n
+    If strict is true, will raise a ValueError if the final batch is shorter than n
+    Note this function is for Python <= 3.11 as it mimics itertools.batched() in Python 3.13
+    """
+    if n < 1:
+        raise ValueError("n must be at least one")
+    iterator = iter(iterable)
+    while batch := tuple(itertools.islice(iterator, n)):
+        if strict and len(batch) != n:
+            raise ValueError("batched(): incomplete batch")
+        yield batch
