@@ -1,4 +1,5 @@
 import datetime
+import itertools
 
 import pytz
 
@@ -33,17 +34,17 @@ def isLogRotating(before_limit, after_limit):
     return False
 
 
-def aware_utcnow() -> datetime:
+def aware_utcnow() -> datetime.datetime:
     """
     Return the current UTC date and time, with tzinfo timezone.utc
 
     Returns:
         datetime: current UTC date and time, with tzinfo timezone.utc
     """
-    return datetime.now(timezone.utc)
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
-def aware_utcfromtimestamp(timestamp: float) -> datetime:
+def aware_utcfromtimestamp(timestamp: float) -> datetime.datetime:
     """
     Return the local date and time, with tzinfo timezone.utc, corresponding to the POSIX timestamp
 
@@ -53,10 +54,10 @@ def aware_utcfromtimestamp(timestamp: float) -> datetime:
     Returns:
         datetime: current UTC date and time, with tzinfo timezone.utc
     """
-    return datetime.fromtimestamp(timestamp, timezone.utc)
+    return datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
 
 
-def naive_utcnow() -> datetime:
+def naive_utcnow() -> datetime.datetime:
     """
     Return the current UTC date and time, without tzinfo
 
@@ -66,7 +67,7 @@ def naive_utcnow() -> datetime:
     return aware_utcnow().replace(tzinfo=None)
 
 
-def naive_utcfromtimestamp(timestamp: float) -> datetime:
+def naive_utcfromtimestamp(timestamp: float) -> datetime.datetime:
     """
     Return the local date and time, without tzinfo, corresponding to the POSIX timestamp
 
@@ -77,3 +78,18 @@ def naive_utcfromtimestamp(timestamp: float) -> datetime:
         datetime: current UTC date and time, without tzinfo
     """
     return aware_utcfromtimestamp(timestamp).replace(tzinfo=None)
+
+
+def batched(iterable, n, *, strict=False):
+    """
+    Batch data from the iterable into tuples of length n. The last batch may be shorter than n
+    If strict is true, will raise a ValueError if the final batch is shorter than n
+    Note this function is for Python <= 3.11 as it mimics itertools.batched() in Python 3.13
+    """
+    if n < 1:
+        raise ValueError("n must be at least one")
+    iterator = iter(iterable)
+    while batch := tuple(itertools.islice(iterator, n)):
+        if strict and len(batch) != n:
+            raise ValueError("batched(): incomplete batch")
+        yield batch
