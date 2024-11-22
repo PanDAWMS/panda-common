@@ -10,6 +10,7 @@ import requests
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 PACKAGE_EMOJI = ":books:"
+PACKAGE_NAME = "panda-common"
 
 
 def get_user():
@@ -70,7 +71,7 @@ def mm_notification():
     # On the repository name we enter an empty space to prevent the URLs to preview on Mattermost
     # We shorten the commit hash to the first seven characters, as they are usually enough to identify a commit
     mm_message = {
-        "text": f"{PACKAGE_EMOJI}**Package upgrade on:** `{server_name}` by `{user}`.",
+        "text": f"{PACKAGE_EMOJI}**{PACKAGE_NAME}@{branch_name} upgrade on:** `{server_name}` by `{user}`.",
         "props": {
             "card": f"""
 | **Property** | **Value** |
