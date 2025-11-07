@@ -76,6 +76,11 @@ def expand_values(target, values_dict):
     for tmp_key in values_dict:
         tmp_val = values_dict[tmp_key]
 
+        # skip non-string values early
+        if not isinstance(tmp_val, str):
+            target.__dict__[tmp_key] = tmp_val
+            continue
+
         # env variable like $VAR, ${VAR}, ${{VAR}}
         if isinstance(tmp_val, str):
             match_object = re.search(r"^\$\{*(\w+)\}*$", tmp_val)
