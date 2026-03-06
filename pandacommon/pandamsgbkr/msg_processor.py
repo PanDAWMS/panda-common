@@ -1,3 +1,4 @@
+import gc
 import json
 import os
 import re
@@ -60,11 +61,12 @@ def get_mb_proxy(name, sconf, qconf, mode="listener", **kwargs):
         recv_heartbeat_ms=sconf.get("recv_heartbeat_ms", 0),
         wait=True,
         ack_mode=qconf.get("ack_mode", "client-individual"),
+        prefetch_size=qconf.get("prefetch_size", 100),
         max_buffer_len=qconf.get("max_buffer_len", 999),
         buffer_block_sec=qconf.get("buffer_block_sec", 10),
         use_transaction=qconf.get("use_transaction", True),
         verbose=sconf.get("verbose", False) or qconf.get("verbose", False),
-        **kwargs
+        **kwargs,
     )
     return mb_proxy
 
@@ -202,6 +204,8 @@ class SimpleMsgProcThread(GenericThread):
                             self.logger.debug("successfully processed")
                     except Exception as e:
                         self.logger.error("error when process message msg_id={0} with {1}: {2} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                    finally:
+                        del msg_obj
                     if self.verbose:
                         self.logger.debug("plugin process end")
             else:
@@ -213,7 +217,7 @@ class SimpleMsgProcThread(GenericThread):
                     if self.verbose:
                         self.logger.debug("successfully processed")
                 except Exception as e:
-                    self.logger.error("error when process with {0}: {1} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                    self.logger.error("error when process with {0}: {1} ".format(e.__class__.__name__, e))
                 if self.verbose:
                     self.logger.debug("plugin process end")
             # as producer
@@ -281,7 +285,7 @@ class MultiMsgProcThread(GenericThread):
             proc_ret = None
             # as consumer
             if self.msg_buffer_map:
-                for in_queue, msg_buffer in msg_buffer_map.items():
+                for in_queue, msg_buffer in self.msg_buffer_map.items():
                     # get from buffer
                     msg_obj = msg_buffer.get()
                     if msg_obj is not None:
@@ -296,6 +300,8 @@ class MultiMsgProcThread(GenericThread):
                                 self.logger.debug("successfully processed")
                         except Exception as e:
                             self.logger.error("error when process message msg_id={0} with {1}: {2} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                        finally:
+                            del msg_obj
                         if self.verbose:
                             self.logger.debug("plugin process end")
             else:
@@ -307,12 +313,12 @@ class MultiMsgProcThread(GenericThread):
                     if self.verbose:
                         self.logger.debug("successfully processed")
                 except Exception as e:
-                    self.logger.error("error when process with {0}: {1} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                    self.logger.error("error when process with {0}: {1} ".format(e.__class__.__name__, e))
                 if self.verbose:
                     self.logger.debug("plugin process end")
             # as producer
             if self.mb_sender_proxy_list and is_processed:
-                for mb_sender_proxy in mb_sender_proxy_list:
+                for mb_sender_proxy in self.mb_sender_proxy_list:
                     self.mb_sender_proxy.send(proc_ret)
                     if self.verbose:
                         self.logger.debug(f"sent a processed message to {mb_sender_proxy.name}")
@@ -670,10 +676,11 @@ class MsgProcAgentBase(GenericThread):
         # main loop
         tmp_logger.debug("looping")
         while self.__to_run:
-            # guard listeners and senders
+            # guard listeners and senders, and do gc
             if time.time() >= self._last_guard_timestamp + self.guard_period:
                 self._guard_listeners(self.init_mb_listener_proxy_list)
                 self._guard_senders(self.init_mb_sender_proxy_list)
+                gc.collect()
                 self._last_guard_timestamp = time.time()
             # sleep
             time.sleep(0.01)
