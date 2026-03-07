@@ -677,7 +677,7 @@ class MsgProcAgentBase(GenericThread):
         # main loop
         tmp_logger.debug("looping")
         while self.__to_run:
-            # guard listeners and senders, and do gc
+            # guard listeners and senders, and trim memory
             if time.time() >= self._last_guard_timestamp + self.guard_period:
                 self._guard_listeners(self.init_mb_listener_proxy_list)
                 self._guard_senders(self.init_mb_sender_proxy_list)
