@@ -1,8 +1,10 @@
+import ctypes
 import gc
 import json
 import os
 import re
 import time
+from ctypes.util import find_library
 
 from pandacommon.pandalogger import logger_utils
 from pandacommon.pandautils.plugin_factory import PluginFactory
@@ -12,6 +14,29 @@ from .msg_bkr_utils import MBListenerProxy, MBSenderProxy, MsgBuffer
 
 # logger
 base_logger = logger_utils.setup_logger("msg_processor")
+
+
+_malloc_trim = None
+if os.name == "posix":
+    try:
+        libc_path = find_library("c")
+        if libc_path:
+            libc = ctypes.CDLL(libc_path)
+            _malloc_trim = libc.malloc_trim
+            _malloc_trim.argtypes = [ctypes.c_size_t]
+            _malloc_trim.restype = ctypes.c_int
+    except Exception:
+        _malloc_trim = None
+
+
+def _try_malloc_trim(tmp_logger):
+    if _malloc_trim is None:
+        return
+    try:
+        _malloc_trim(0)
+        tmp_logger.debug("called malloc_trim to release free heap pages to OS")
+    except Exception as e:
+        tmp_logger.debug(f"malloc_trim failed: {e}")
 
 
 # get mb proxy instance
@@ -681,6 +706,7 @@ class MsgProcAgentBase(GenericThread):
                 self._guard_listeners(self.init_mb_listener_proxy_list)
                 self._guard_senders(self.init_mb_sender_proxy_list)
                 gc.collect()
+                _try_malloc_trim(tmp_logger)
                 self._last_guard_timestamp = time.time()
             # sleep
             time.sleep(0.01)
