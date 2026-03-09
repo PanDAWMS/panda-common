@@ -82,10 +82,9 @@ def expand_values(target, values_dict):
             continue
 
         # env variable like $VAR, ${VAR}, ${{VAR}}
-        if isinstance(tmp_val, str):
-            match_object = re.search(r"^\$\{*(\w+)\}*$", tmp_val)
-            if match_object and match_object.group(1) in os.environ:
-                tmp_val = os.environ[match_object.group(1)]
+        match_object = re.search(r"^\$\{*(\w+)\}*$", tmp_val)
+        if match_object and match_object.group(1) in os.environ:
+            tmp_val = os.environ[match_object.group(1)]
 
         # convert string to bool/int
         if tmp_val == "True":
