@@ -320,7 +320,7 @@ class MultiMsgProcThread(GenericThread):
             # as producer
             if self.mb_sender_proxy_list and is_processed:
                 for mb_sender_proxy in self.mb_sender_proxy_list:
-                    self.mb_sender_proxy.send(proc_ret)
+                    mb_sender_proxy.send(proc_ret)
                     if self.verbose:
                         self.logger.debug(f"sent a processed message to {mb_sender_proxy.name}")
             # sleep
