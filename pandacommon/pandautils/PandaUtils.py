@@ -1,5 +1,9 @@
+import ctypes
 import datetime
 import itertools
+import os
+from ctypes.util import find_library
+from functools import lru_cache
 
 import pytz
 
@@ -94,6 +98,7 @@ def batched(iterable, n, *, strict=False):
             raise ValueError("batched(): incomplete batch")
         yield batch
 
+
 def get_sql_IN_bind_variables(values, prefix: str, value_as_suffix=False) -> tuple[str, dict]:
     """
     Get the comma-separated string expression with bind variables to be used with SQL IN-condition and the corresponding variable map
@@ -120,3 +125,54 @@ def get_sql_IN_bind_variables(values, prefix: str, value_as_suffix=False) -> tup
         ret_var_map[var_name] = value
     ret_var_names_str = ",".join(var_name_list)
     return ret_var_names_str, ret_var_map
+
+
+@lru_cache(maxsize=1)
+def _get_malloc_trim():
+    if os.name != "posix":
+        return None
+    libc_path = find_library("c")
+    if not libc_path:
+        return None
+    try:
+        libc = ctypes.CDLL(libc_path)
+        malloc_trim = libc.malloc_trim
+    except (OSError, AttributeError):
+        # libc could not be loaded, or malloc_trim is not available on this platform
+        return None
+    try:
+        malloc_trim.argtypes = [ctypes.c_size_t]
+        malloc_trim.restype = ctypes.c_int
+    except Exception:
+        # Unexpected failure configuring malloc_trim; treat as unavailable
+        return None
+    return malloc_trim
+
+
+def try_malloc_trim(logger=None) -> bool:
+    """
+    Best-effort release of free heap pages to the OS on supported platforms.
+
+    Args:
+        logger: optional logger instance with debug method
+
+    Returns:
+        bool: True if malloc_trim was successfully called, False otherwise
+    """
+    try:
+        malloc_trim = _get_malloc_trim()
+    except Exception as e:
+        if logger is not None:
+            logger.debug(f"malloc_trim unavailable: {e}")
+        return False
+    if malloc_trim is None:
+        return False
+    try:
+        malloc_trim(0)
+        if logger is not None:
+            logger.debug("called malloc_trim to release free heap pages to OS")
+        return True
+    except Exception as e:
+        if logger is not None:
+            logger.debug(f"malloc_trim failed: {e}")
+        return False
