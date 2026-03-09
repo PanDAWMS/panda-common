@@ -134,10 +134,18 @@ def _get_malloc_trim():
     libc_path = find_library("c")
     if not libc_path:
         return None
-    libc = ctypes.CDLL(libc_path)
-    malloc_trim = libc.malloc_trim
-    malloc_trim.argtypes = [ctypes.c_size_t]
-    malloc_trim.restype = ctypes.c_int
+    try:
+        libc = ctypes.CDLL(libc_path)
+        malloc_trim = libc.malloc_trim
+    except (OSError, AttributeError):
+        # libc could not be loaded, or malloc_trim is not available on this platform
+        return None
+    try:
+        malloc_trim.argtypes = [ctypes.c_size_t]
+        malloc_trim.restype = ctypes.c_int
+    except Exception:
+        # Unexpected failure configuring malloc_trim; treat as unavailable
+        return None
     return malloc_trim
 
 
