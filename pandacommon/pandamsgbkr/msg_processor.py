@@ -79,7 +79,7 @@ class SimpleMsgProcPluginBase:
     Simple message processor suits following cases:
         - one-out: to create a messages and send them to one queue
         - one-in: to receive messages from one queue and processes the messages
-        - one-in-one-out: to receive messages from one queue, processes the messages to create new messages, and then and send new messages to another queue
+        - one-in-one-out: to receive messages from one queue, processes the messages to create new messages, and then send new messages to another queue
     """
 
     def __init__(self, **params):

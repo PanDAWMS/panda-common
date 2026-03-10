@@ -118,7 +118,7 @@ class MsgBuffer:
             return _BUFFER_MAP[key]
 
     def __init__(self, *args, **kwargs):
-        # Do NOT write anything here becuase of singleton
+        # Do NOT write anything here because of singleton
         pass
 
     def size(self):
