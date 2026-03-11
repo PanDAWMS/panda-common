@@ -696,12 +696,11 @@ class MsgProcAgentBase(GenericThread):
         self._kill_processors(self.init_processor_list)
         tmp_logger.debug("done")
 
-    def start_passive_mode(self, in_q_list=None, out_q_list=None, prefetch_size=100):
+    def start_passive_mode(self, in_q_list=None, out_q_list=None):
         """
         start passive mode: only spawn mb proxies (without spawning agent and plugin threads)
         in_q_list: list of inward queue name
         out_q_list: list of outward queue name
-        prefetch_size: prefetch size of the message broker (can control number of un-acknowledged messages stored in the local buffer)
         returns dict of mb proxies
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="start_passive_mode")
@@ -720,8 +719,10 @@ class MsgProcAgentBase(GenericThread):
             qconf = self._queues_dict[in_queue]
             if not qconf.get("enable", True):
                 continue
+            if qconf.get("prefetch_size") is None:
+                qconf["prefetch_size"] = 5
             sconf = self._mb_servers_dict[qconf["server"]]
-            mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode="listener", prefetch_size=prefetch_size)
+            mb_listener_proxy = get_mb_proxy(name=in_queue, sconf=sconf, qconf=qconf, mode="listener")
             self.passive_mb_listener_proxy_dict[in_queue] = mb_listener_proxy
         # mb_sender_proxy instances
         for out_queue in out_q_list:
