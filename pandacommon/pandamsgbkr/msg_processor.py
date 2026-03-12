@@ -707,11 +707,11 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger.debug("start")
         # initialize
         # self.initialize()
-        all_queue_names = list(self._queues_dict.keys())
+        # all_queue_names = list(self._queues_dict.keys())
         if in_q_list is None:
-            in_q_list = all_queue_names
+            in_q_list = []
         if out_q_list is None:
-            out_q_list = all_queue_names
+            out_q_list = []
         # mb_listener_proxy instances
         for in_queue in in_q_list:
             if in_queue not in self._queues_dict:
