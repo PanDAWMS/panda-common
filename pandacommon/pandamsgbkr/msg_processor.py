@@ -4,6 +4,7 @@ import os
 import re
 import time
 import traceback
+from typing import Any
 
 from pandacommon.pandalogger import logger_utils
 from pandacommon.pandautils.PandaUtils import try_malloc_trim
@@ -17,9 +18,19 @@ base_logger = logger_utils.setup_logger("msg_processor")
 
 
 # get mb proxy instance
-def get_mb_proxy(name, sconf, qconf, mode="listener", **kwargs):
+def get_mb_proxy(name: str, sconf: dict[str, Any], qconf: dict[str, Any], mode: str = "listener", **kwargs) -> MBListenerProxy | MBSenderProxy:
     """
-    get MBListenerProxy or MBSenderProxy instance according to config dict
+    Get MBListenerProxy or MBSenderProxy instance according to config dict.
+
+    Args:
+        name: Name identifier for the proxy.
+        sconf: Server configuration dictionary with connection parameters.
+        qconf: Queue configuration dictionary with queue parameters.
+        mode: Mode of operation - 'listener' or 'sender'.
+        **kwargs: Additional keyword arguments to pass to the proxy.
+
+    Returns:
+        MBListenerProxy or MBSenderProxy instance based on mode.
     """
     # class of mb proxy
     the_class = MBListenerProxy
@@ -76,42 +87,63 @@ def get_mb_proxy(name, sconf, qconf, mode="listener", **kwargs):
 # simple message processor plugin Base
 class SimpleMsgProcPluginBase:
     """
-    Base class of simple message processor plugin
+    Base class of simple message processor plugin.
+
     Simple message processor suits following cases:
-        - one-out: to create a messages and send them to one queue
-        - one-in: to receive messages from one queue and processes the messages
-        - one-in-one-out: to receive messages from one queue, processes the messages to create new messages, and then send new messages to another queue
+        - one-out: to create messages and send them to one queue
+        - one-in: to receive messages from one queue and process them
+        - one-in-one-out: to receive messages from one queue, process them, and send new messages to another queue
     """
 
-    def __init__(self, **params):
+    def __init__(self, **params: Any) -> None:
         """
-        Low level initialization called by plugin factory
-        The dict of params configured is passed to self.params
-        Do NOT overwrite __init__ for initialization. Instead, overwrite initialize(self) function
+        Low level initialization called by plugin factory.
+
+        Args:
+            **params: Dictionary of parameters configured for this plugin.
+
+        Returns:
+            None
         """
         self.params = params
 
-    def initialize(self):
+    def initialize(self) -> None:
         """
-        initialize plugin instance, run once before loop in thread
+        Initialize plugin instance, run once before loop in thread.
+
+        Returns:
+            None
         """
 
-    def terminate(self):
+    def terminate(self) -> None:
         """
-        terminate plugin instance, run before stopping the thread
+        Terminate plugin instance, run before stopping the thread.
+
+        Returns:
+            None
         """
 
-    def process(self, msg_obj):
+    def process(self, msg_obj: Any) -> Any:
         """
-        process the message
-        Get msg_obj from the incoming MQ (if any; otherwise msg_obj is None)
-        Returned value will be sent to the outgoing MQ (if any)
+        Process the message.
+
+        Get msg_obj from the incoming MQ (if any; otherwise msg_obj is None).
+        Returned value will be sent to the outgoing MQ (if any).
+
+        Args:
+            msg_obj: Message object from incoming queue, or None if no input queue.
+
+        Returns:
+            Processed message object to send to outgoing queue.
         """
         raise NotImplementedError
 
-    def get_pid(self):
+    def get_pid(self) -> str:
         """
-        get generic pid, including hostname, os process id, thread id
+        Get generic pid, including hostname, OS process ID, and thread ID.
+
+        Returns:
+            String representation of generic PID.
         """
         return GenericThread().get_pid(current=True)
 
@@ -129,10 +161,23 @@ class SimpleMsgProcPluginBase:
 # simple message processor thread
 class SimpleMsgProcThread(GenericThread):
     """
-    Thread of simple message processor of certain plugin
+    Thread of simple message processor with certain plugin.
     """
 
-    def __init__(self, plugin, attr_dict, sleep_time_min, sleep_time_max, thread_j):
+    def __init__(self, plugin: SimpleMsgProcPluginBase, attr_dict: dict[str, Any], sleep_time_min: float, sleep_time_max: float, thread_j: int) -> None:
+        """
+        Initialize SimpleMsgProcThread.
+
+        Args:
+            plugin: SimpleMsgProcPluginBase instance to process messages.
+            attr_dict: Dictionary containing thread attributes (in_queue, mb_sender_proxy, verbose, etc).
+            sleep_time_min: Minimum sleep time in seconds when message is processed.
+            sleep_time_max: Maximum sleep time in seconds when no message is processed.
+            thread_j: Thread index number.
+
+        Returns:
+            None
+        """
         GenericThread.__init__(self)
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="SimpleMsgProcThread.__init__")
         self.__to_run = True
@@ -144,7 +189,13 @@ class SimpleMsgProcThread(GenericThread):
         self.thread_j = thread_j
         self.verbose = attr_dict.get("verbose", False)
 
-    def run(self):
+    def run(self) -> None:
+        """
+        Main thread execution loop for multi-message processing.
+
+        Returns:
+            None
+        """
         # update logger thread id
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="SimpleMsgProcThread")
         # start
@@ -212,9 +263,9 @@ class SimpleMsgProcThread(GenericThread):
         self.plugin.terminate()
         self.logger.info("stopped run")
 
-    def stop(self):
+    def stop(self) -> None:
         """
-        send stop signal to this thread; will stop after current loop done
+        Send stop signal to this thread; will stop after current loop done
         """
         self.logger.debug("stop method called")
         self.__to_run = False
@@ -223,10 +274,23 @@ class SimpleMsgProcThread(GenericThread):
 # simple message processor thread
 class MultiMsgProcThread(GenericThread):
     """
-    Thread of multi-message processor of certain plugin
+    Thread of multi-message processor of certain plugin.
     """
 
-    def __init__(self, plugin, attr_dict, sleep_time_min, sleep_time_max, thread_j):
+    def __init__(self, plugin: SimpleMsgProcPluginBase, attr_dict: dict[str, Any], sleep_time_min: float, sleep_time_max: float, thread_j: int) -> None:
+        """
+        Initialize MultiMsgProcThread.
+
+        Args:
+            plugin: SimpleMsgProcPluginBase instance to process messages.
+            attr_dict: Dictionary containing thread attributes.
+            sleep_time_min: Minimum sleep time in seconds.
+            sleep_time_max: Maximum sleep time in seconds.
+            thread_j: Thread index number.
+
+        Returns:
+            None
+        """
         GenericThread.__init__(self)
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="MultiMsgProcThread.__init__")
         self.__to_run = True
@@ -238,7 +302,13 @@ class MultiMsgProcThread(GenericThread):
         self.thread_j = thread_j
         self.verbose = attr_dict.get("verbose", False)
 
-    def run(self):
+    def run(self) -> None:
+        """
+        Main thread execution loop for multi-message processing.
+
+        Returns:
+            None
+        """
         # update logger thread id
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="MultiMsgProcThread")
         # start
@@ -311,9 +381,9 @@ class MultiMsgProcThread(GenericThread):
         self.plugin.terminate()
         self.logger.info("stopped run")
 
-    def stop(self):
+    def stop(self) -> None:
         """
-        send stop signal to this thread; will stop after current loop done
+        Send stop signal to this thread; will stop after current loop done
         """
         self.logger.debug("stop method called")
         self.__to_run = False
@@ -325,7 +395,19 @@ class MsgProcAgentBase(GenericThread):
     Base class of message processing agent (main thread)
     """
 
-    def __init__(self, config_file, process_sleep_time_min=0.0001, process_sleep_time_max=0.005, **kwargs):
+    def __init__(self, config_file: str, process_sleep_time_min: float = 0.0001, process_sleep_time_max: float = 0.005, **kwargs: Any) -> None:
+        """
+        Initialize MsgProcAgentBase.
+
+        Args:
+            config_file: Path to the configuration JSON file.
+            process_sleep_time_min: Minimum sleep time for message processing.
+            process_sleep_time_max: Maximum sleep time for message processing.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            None
+        """
         GenericThread.__init__(self)
         self.__to_run = True
         self.config_file = config_file
@@ -348,43 +430,12 @@ class MsgProcAgentBase(GenericThread):
         # done
         tmp_logger.info("done")
 
-    def _parse_config(self):
+    def _parse_config(self) -> None:
         """
-        parse message processor configuration json file
-        Typical example dict from config json:
-        mb_servers_dict = {
-                'Server_1': {
-                    'host_port_list': ['192.168.0.1:777', '192.168.0.2:777'],
-                    'use_ssl': True,
-                    'cert_file': 'aaa.cert.pem',
-                    'key_file': 'bbb.key.pem',
-                    'username': 'someuser',
-                    'passcode': 'xxxxyyyyzzzz',
-                    'vhost': '/somehost',
-                    'verbose': False,
-                },
-                ...
-            }
-        queues_dict = {
-                'Queue_1': {
-                    'enable': True,
-                    'server': 'Server_1',
-                    'destination': '/queue/some_queue',
-                    'verbose': True,
-                },
-                ...
-            }
-        processors_dict = {
-                'Processor_1': {
-                    'enable': True,
-                    'module': 'plugin.module',
-                    'name': 'PluginClassName',
-                    'n_threads': 1,
-                    'in_queue': 'Queue_1',
-                    'out_queue': 'Queue_2',
-                },
-                ...
-            }
+        Parse message processor configuration JSON file.
+
+        Returns:
+            None
         """
         # logger
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="_parse_config")
@@ -400,9 +451,12 @@ class MsgProcAgentBase(GenericThread):
             self.guard_period = raw_dict["guard_period"]
         tmp_logger.debug("done")
 
-    def _setup_instances(self):
+    def _setup_instances(self) -> None:
         """
-        set up attributes and MBListenerProxy/plugin instances accordingly
+        Set up attributes and MBListenerProxy/plugin instances accordingly.
+
+        Returns:
+            None
         """
         # logger
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="_setup_instances")
@@ -487,7 +541,7 @@ class MsgProcAgentBase(GenericThread):
         del in_q_set, out_q_set, mb_listener_proxy_dict, mb_sender_proxy_dict, processor_attr_map
         tmp_logger.debug("done")
 
-    def _spawn_listeners(self, mb_listener_proxy_list):
+    def _spawn_listeners(self, mb_listener_proxy_list: list) -> None:
         """
         spawn connection/listener threads of certain message broker listener proxy
         """
@@ -498,7 +552,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"spawned listener {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _guard_listeners(self, mb_listener_proxy_list):
+    def _guard_listeners(self, mb_listener_proxy_list: list) -> None:
         """
         guard connection/listener threads of certain message broker listener proxy, reconnect when disconnected
         """
@@ -513,7 +567,7 @@ class MsgProcAgentBase(GenericThread):
                 tmp_logger.info(f"restarted listener {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _kill_listeners(self, mb_listener_proxy_list):
+    def _kill_listeners(self, mb_listener_proxy_list: list) -> None:
         """
         kill connection/listener threads of certain message broker listener proxy
         """
@@ -524,7 +578,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"stopped listener {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _spawn_senders(self, mb_sender_proxy_list):
+    def _spawn_senders(self, mb_sender_proxy_list: list) -> None:
         """
         spawn connection/sender threads of certain message broker sender proxy
         """
@@ -535,7 +589,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"spawned sender {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _guard_senders(self, mb_sender_proxy_list):
+    def _guard_senders(self, mb_sender_proxy_list: list) -> None:
         """
         guard connection/sender threads of certain message broker sender proxy, reconnect when disconnected
         """
@@ -550,7 +604,7 @@ class MsgProcAgentBase(GenericThread):
                 tmp_logger.info(f"restarted sender {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _kill_senders(self, mb_sender_proxy_list):
+    def _kill_senders(self, mb_sender_proxy_list: list) -> None:
         """
         kill connection/sender threads of certain message broker sender proxy
         """
@@ -561,7 +615,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"stopped sender {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _spawn_processors(self, processor_list):
+    def _spawn_processors(self, processor_list: list) -> None:
         """
         spawn processors threads
         """
@@ -586,7 +640,7 @@ class MsgProcAgentBase(GenericThread):
                 )
         tmp_logger.debug("done")
 
-    def _kill_processors(self, processor_list, block=True):
+    def _kill_processors(self, processor_list: list, block: bool = True) -> None:
         """
         kill processor threads
         """
@@ -611,7 +665,7 @@ class MsgProcAgentBase(GenericThread):
                 tmp_logger.error(f"failed to stop processor thread {processor_id} ; {e.__class__.__name__}: {e} ")
         tmp_logger.debug("done")
 
-    def initialize(self):
+    def initialize(self) -> None:
         """
         customized initialize method
         this method can override attributes set from config file
@@ -621,7 +675,7 @@ class MsgProcAgentBase(GenericThread):
 
         tmp_logger.debug("done")
 
-    def stop(self, block=True):
+    def stop(self, block: bool = True) -> None:
         """
         send stop signal to this thread
         """
@@ -634,9 +688,9 @@ class MsgProcAgentBase(GenericThread):
                 time.sleep(0.01)
         tmp_logger.debug("done")
 
-    def run(self):
+    def run(self) -> None:
         """
-        main thread
+        Main thread
         """
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="run")
         tmp_logger.debug("start")
@@ -672,7 +726,7 @@ class MsgProcAgentBase(GenericThread):
         self._kill_processors(self.init_processor_list)
         tmp_logger.debug("done")
 
-    def start_passive_mode(self, in_q_list=None, out_q_list=None):
+    def start_passive_mode(self, in_q_list: list[str] | None = None, out_q_list: list[str] | None = None) -> dict:
         """
         start passive mode: only spawn mb proxies (without spawning agent and plugin threads)
         in_q_list: list of inward queue name
@@ -725,7 +779,7 @@ class MsgProcAgentBase(GenericThread):
             "out": self.passive_mb_sender_proxy_dict,
         }
 
-    def stop_passive_mode(self):
+    def stop_passive_mode(self) -> None:
         """
         stop mb proxies which were spawned in passive mode
         """
