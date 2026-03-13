@@ -3,6 +3,7 @@ import json
 import os
 import re
 import time
+import traceback
 
 from pandacommon.pandalogger import logger_utils
 from pandacommon.pandautils.PandaUtils import try_malloc_trim
@@ -116,43 +117,13 @@ class SimpleMsgProcPluginBase:
 
 
 # multi-message processor plugin Base
-class MultiMsgProcPluginBase:
-    """
-    Base class of multi-message processor plugin
-    For multi-in-multi-out message processor thread
-    """
+# class MultiMsgProcPluginBase(SimpleMsgProcPluginBase):
+#     """
+#     Base class of multi-message processor plugin
+#     For multi-in-multi-out message processor thread
+#     """
 
-    def __init__(self, **params):
-        """
-        Low level initialization called by plugin factory
-        The dict of params configured is passed to self.params
-        Do NOT overwrite __init__ for initialization. Instead, overwrite initialize(self) function
-        """
-        self.params = params
-
-    def initialize(self):
-        """
-        initialize plugin instance, run once before loop in thread
-        """
-
-    def terminate(self):
-        """
-        terminate plugin instance, run before stopping the thread
-        """
-
-    def process(self, msg_obj):
-        """
-        process the message
-        Get msg_obj from the incoming MQ (if any; otherwise msg_obj is None)
-        Returned value will be sent to the outgoing MQ (if any)
-        """
-        raise NotImplementedError
-
-    def get_pid(self):
-        """
-        get generic pid, including hostname, os process id, thread id
-        """
-        return GenericThread().get_pid(current=True)
+#     pass
 
 
 # simple message processor thread
@@ -204,7 +175,8 @@ class SimpleMsgProcThread(GenericThread):
                         if self.verbose:
                             self.logger.debug("successfully processed")
                     except Exception as e:
-                        self.logger.error("error when process message msg_id={0} with {1}: {2} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                        tb_str = traceback.format_exc()
+                        self.logger.error("error when process message msg_id={0} with {1}: {2} \n{3}".format(msg_obj.msg_id, e.__class__.__name__, e, tb_str))
                     finally:
                         del msg_obj
                     if self.verbose:
@@ -218,7 +190,8 @@ class SimpleMsgProcThread(GenericThread):
                     if self.verbose:
                         self.logger.debug("successfully processed")
                 except Exception as e:
-                    self.logger.error("error when process with {0}: {1} ".format(e.__class__.__name__, e))
+                    tb_str = traceback.format_exc()
+                    self.logger.error("error when process with {0}: {1} \n{2}".format(e.__class__.__name__, e, tb_str))
                 if self.verbose:
                     self.logger.debug("plugin process end")
             # as producer
@@ -258,8 +231,8 @@ class MultiMsgProcThread(GenericThread):
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="MultiMsgProcThread.__init__")
         self.__to_run = True
         self.plugin = plugin
-        self.in_queue_list = attr_dict.get("in_queue_list")
-        self.mb_sender_proxy_list = attr_dict.get("mb_sender_proxy_list")
+        self.in_queue_list = attr_dict.get("in_queue_list", [])
+        self.mb_sender_proxy_list = attr_dict.get("mb_sender_proxy_list", [])
         self.sleep_time_min = sleep_time_min
         self.sleep_time_max = sleep_time_max
         self.thread_j = thread_j
@@ -300,7 +273,10 @@ class MultiMsgProcThread(GenericThread):
                             if self.verbose:
                                 self.logger.debug("successfully processed")
                         except Exception as e:
-                            self.logger.error("error when process message msg_id={0} with {1}: {2} ".format(msg_obj.msg_id, e.__class__.__name__, e))
+                            tb_str = traceback.format_exc()
+                            self.logger.error(
+                                "error when process message msg_id={0} with {1}: {2} \n{3}".format(msg_obj.msg_id, e.__class__.__name__, e, tb_str)
+                            )
                         finally:
                             del msg_obj
                         if self.verbose:
@@ -314,7 +290,8 @@ class MultiMsgProcThread(GenericThread):
                     if self.verbose:
                         self.logger.debug("successfully processed")
                 except Exception as e:
-                    self.logger.error("error when process with {0}: {1} ".format(e.__class__.__name__, e))
+                    tb_str = traceback.format_exc()
+                    self.logger.error("error when process with {0}: {1} \n{2}".format(e.__class__.__name__, e, tb_str))
                 if self.verbose:
                     self.logger.debug("plugin process end")
             # as producer
@@ -366,7 +343,6 @@ class MsgProcAgentBase(GenericThread):
         self.passive_mb_sender_proxy_dict = {}
         self.guard_period = 300
         self._last_guard_timestamp = 0
-        self.prefetch_count = None
         # log
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="__init__")
         # parse config
@@ -488,10 +464,16 @@ class MsgProcAgentBase(GenericThread):
         for proc in processor_attr_map.keys():
             in_queue = processor_attr_map[proc]["in_queue"]
             if in_queue:
-                processor_attr_map[proc]["mb_listener_proxy"] = mb_listener_proxy_dict[in_queue]
+                if in_queue in mb_listener_proxy_dict:
+                    processor_attr_map[proc]["mb_listener_proxy"] = mb_listener_proxy_dict[in_queue]
+                else:
+                    tmp_logger.warning("processor {0} input queue {1} is missing or disabled. Skip attaching listener".format(proc, in_queue))
             out_queue = processor_attr_map[proc]["out_queue"]
             if out_queue:
-                processor_attr_map[proc]["mb_sender_proxy"] = mb_sender_proxy_dict[out_queue]
+                if out_queue in mb_sender_proxy_dict:
+                    processor_attr_map[proc]["mb_sender_proxy"] = mb_sender_proxy_dict[out_queue]
+                else:
+                    tmp_logger.warning("processor {0} output queue {1} is missing or disabled. Skip attaching sender".format(proc, out_queue))
         # fill processor list
         self.init_processor_list = []
         for processor_name, attr_dict in processor_attr_map.items():
@@ -598,8 +580,12 @@ class MsgProcAgentBase(GenericThread):
                 mc_thread = self.processor_thread_map[processor_id]
                 mc_thread.start()
                 tmp_logger.info(
-                    "spawned processors thread {0} with plugin={1} , in_q={2}, out_q={3}".format(
-                        processor_id, attr_dict["plugin_class_name"], attr_dict["in_queue"], attr_dict["out_queue"]
+                    "spawned processor thread {0} ({1}) with plugin={2} , in_q={3}, out_q={4}".format(
+                        processor_id,
+                        mc_thread.__class__.__name__,
+                        attr_dict["plugin_class_name"],
+                        attr_dict.get("in_queue"),
+                        attr_dict.get("out_queue"),
                     )
                 )
             except Exception as e:

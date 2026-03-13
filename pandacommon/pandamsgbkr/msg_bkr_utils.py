@@ -11,11 +11,6 @@ import time
 import traceback
 import uuid
 
-try:
-    from queue import Empty, Queue
-except ImportError:
-    from Queue import Empty, Queue
-
 import stomp
 
 from pandacommon.pandalogger import logger_utils
@@ -69,11 +64,20 @@ def _get_connection_dict(
             try:
                 conn = stomp.Connection12(host_and_ports=[(host, port)], vhost=vhost, keepalive=keepalive, heartbeats=(send_heartbeat_ms, recv_heartbeat_ms))
                 if use_ssl:
-                    ssl_opts = {"ssl_version": ssl.PROTOCOL_TLSv1, "cert_file": cert_file, "key_file": key_file}
-                    conn.set_ssl(for_hosts=[(host, port)], **ssl_opts)
+                    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                    ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+                    ssl_ctx.check_hostname = False
+                    ssl_ctx.verify_mode = ssl.CERT_NONE
+                    if cert_file and key_file:
+                        ssl_ctx.load_cert_chain(cert_file, key_file)
+                    try:
+                        conn.set_ssl(for_hosts=[(host, port)], ssl_context=ssl_ctx)
+                    except TypeError:
+                        # Older stomp.py without ssl_context parameter
+                        conn.set_ssl(for_hosts=[(host, port)], cert_file=cert_file, key_file=key_file)
             except AttributeError:
-                # Older version of stomp.py
-                ssl_opts = {"use_ssl": use_ssl, "ssl_version": ssl.PROTOCOL_TLSv1, "ssl_cert_file": cert_file, "ssl_key_file": key_file}
+                # Older version of stomp.py without set_ssl method
+                ssl_opts = {"use_ssl": use_ssl, "ssl_cert_file": cert_file, "ssl_key_file": key_file} if use_ssl else {}
                 conn = stomp.Connection12(
                     host_and_ports=[(host, port)], vhost=vhost, keepalive=keepalive, heartbeats=(send_heartbeat_ms, recv_heartbeat_ms), **ssl_opts
                 )
@@ -264,6 +268,28 @@ class MBProxyBase:
     def is_connected_to_rabbitmq(self):
         return getattr(self, "mq_server", None) and self.mq_server.startswith("RabbitMQ/")
 
+    @property
+    def got_connected(self):
+        return self._got_connected_event.is_set()
+
+    @got_connected.setter
+    def got_connected(self, value):
+        if value:
+            self._got_connected_event.set()
+        else:
+            self._got_connected_event.clear()
+
+    @property
+    def got_disconnected(self):
+        return self._got_disconnected_event.is_set()
+
+    @got_disconnected.setter
+    def got_disconnected(self, value):
+        if value:
+            self._got_disconnected_event.set()
+        else:
+            self._got_disconnected_event.clear()
+
     def _on_connected(self, headers):
         # fill mq_server
         self.mq_server = headers.get("server")
@@ -283,7 +309,7 @@ class MBProxyBase:
 
     def _on_error(self, headers):
         # reset new_destination and restart if getting rabbitmq not_found for queue
-        if self.is_connected_to_rabbitmq and headers.get("message") == "not_found":
+        if self.is_connected_to_rabbitmq() and headers.get("message") == "not_found":
             if self.destination.startswith("/amq/queue"):
                 # new_destination change for rabbitmq queue /queue vs /amq/queue
                 self.new_destination = re.sub(r"^/amq/queue/", "/queue/", self.orig_destination)
@@ -338,6 +364,8 @@ class MBListenerProxy(MBProxyBase):
         self.destination = self.orig_destination
         # destination used in retry
         self.new_destination = self.orig_destination
+        # whether to freeze destination change (used when RabbitMQ not_found error occurs)
+        self._to_freeze_dest = False
         # randomness
         fqdn_pid = get_fqdn_pid()
         tmp_timestamp_str = str(time.time())
@@ -371,10 +399,10 @@ class MBListenerProxy(MBProxyBase):
         self.dump_msgs = []
         # number of attempts to restart
         self.n_restart = 0
-        # whether got connected from on_connected
-        self.got_connected = False
-        # whether got disconnected from on_disconnected
-        self.got_disconnected = False
+        # whether got connected from on_connected (thread-safe event)
+        self._got_connected_event = threading.Event()
+        # whether got disconnected from on_disconnected (thread-safe event)
+        self._got_disconnected_event = threading.Event()
         # whether to disconnect intentionally
         self.to_disconnect = False
         # whether to log verbosely
@@ -414,7 +442,7 @@ class MBListenerProxy(MBProxyBase):
                 self.logger.debug("got connection about {0}".format(conn_id))
         elif self.conn_mode == "any":
             # for receiver, subscribe any single host behind the same hostname
-            conn_id, conn = random.choice([self.connection_dict.items()])
+            conn_id, conn = random.choice(list(self.connection_dict.items()))
             listener = MsgListener(mb_proxy=self, conn_id=conn_id, verbose=self.verbose)
             self.listener_dict[conn_id] = listener
             self.logger.debug("got connection about {0}".format(conn_id))
@@ -589,6 +617,8 @@ class MBSenderProxy(MBProxyBase):
         self.destination = self.orig_destination
         # destination used in retry
         self.new_destination = self.orig_destination
+        # whether to freeze destination change (used when RabbitMQ not_found error occurs)
+        self._to_freeze_dest = False
         # randomness
         fqdn_pid = get_fqdn_pid()
         tmp_timestamp_str = str(time.time())
@@ -602,10 +632,10 @@ class MBSenderProxy(MBProxyBase):
         self.connect_params = {"username": username, "passcode": passcode, "wait": wait, "headers": {"client-id": self.client_id}}
         # number of attempts to restart
         self.n_restart = 0
-        # whether got connected from on_connected
-        self.got_connected = False
-        # whether got disconnected from on_disconnected
-        self.got_disconnected = False
+        # whether got connected from on_connected (thread-safe event)
+        self._got_connected_event = threading.Event()
+        # whether got disconnected from on_disconnected (thread-safe event)
+        self._got_disconnected_event = threading.Event()
         # whether to disconnect intentionally
         self.to_disconnect = False
         # whether to log verbosely
