@@ -10,7 +10,6 @@ import threading
 import time
 import traceback
 import uuid
-from typing import Any
 
 import stomp
 
@@ -416,6 +415,94 @@ class MBProxyBase:
     Base MBProxy class
     """
 
+    def __init__(
+        self,
+        name: str,
+        host_port_list: list[str],
+        destination: str,
+        use_ssl: bool = False,
+        cert_file: str | None = None,
+        key_file: str | None = None,
+        vhost: str | None = None,
+        username: str | None = None,
+        passcode: str | None = None,
+        wait: bool = True,
+        verbose: bool = False,
+        keepalive: bool = True,
+        send_heartbeat_ms: int = 60000,
+        recv_heartbeat_ms: int = 0,
+        proxy_class_name: str = "MBProxyBase",
+    ) -> None:
+        """
+        Initialize MBProxyBase with common connection parameters.
+
+        Args:
+            name: Name of message queue.
+            host_port_list: List of host:port pairs for message broker.
+            destination: Message destination/queue name.
+            use_ssl: Whether to use SSL for connections.
+            cert_file: Path to SSL certificate file.
+            key_file: Path to SSL key file.
+            vhost: Virtual host for message broker.
+            username: Username for authentication.
+            passcode: Password for authentication.
+            wait: Wait for connection.
+            verbose: Enable verbose logging.
+            keepalive: Enable keepalive for connections.
+            send_heartbeat_ms: Send heartbeat interval in milliseconds.
+            recv_heartbeat_ms: Receive heartbeat interval in milliseconds.
+            proxy_class_name: Class name of the proxy (for subscription ID generation).
+
+        Returns:
+            None
+        """
+        # logger
+        self.logger = logger_utils.make_logger(base_logger, token=name, method_name=proxy_class_name)
+        # name of message queue
+        self.name = name
+        # connection parameters
+        self.host_port_list = host_port_list
+        self.use_ssl = use_ssl
+        self.cert_file = cert_file
+        self.key_file = key_file
+        self.vhost = vhost
+        # original destination
+        self.orig_destination = destination
+        # lock for destination change
+        self.dest_lock = threading.Lock()
+        # destination to subscribe
+        self.destination = self.orig_destination
+        # destination used in retry
+        self.new_destination = self.orig_destination
+        # whether to freeze destination change (used when RabbitMQ not_found error occurs)
+        self._to_freeze_dest = False
+        # randomness
+        fqdn_pid = get_fqdn_pid()
+        tmp_timestamp_str = str(time.time())
+        random.seed(f"{fqdn_pid}:{tmp_timestamp_str}")
+        n_rand = random.randrange(10**6)
+        # subscription ID
+        self.sub_id = f"panda-{proxy_class_name}_{fqdn_pid}_r{n_rand:06}"
+        # client ID
+        self.client_id = f"client_{self.sub_id}_{hex(id(self))}"
+        # connect parameters
+        self.connect_params = {"username": username, "passcode": passcode, "wait": wait, "headers": {"client-id": self.client_id}}
+        # number of attempts to restart
+        self.n_restart = 0
+        # whether got connected from on_connected (thread-safe event)
+        self._got_connected_event = threading.Event()
+        # whether got disconnected from on_disconnected (thread-safe event)
+        self._got_disconnected_event = threading.Event()
+        # whether to disconnect intentionally
+        self.to_disconnect = False
+        # whether to log verbosely
+        self.verbose = verbose
+        # whether to enable keepalive
+        self.keepalive = keepalive
+        # sending and wanting-to-receive heartbeat period in microseconds
+        self.send_heartbeat_ms = send_heartbeat_ms
+        self.recv_heartbeat_ms = recv_heartbeat_ms
+
     def is_connected_to_rabbitmq(self) -> bool:
         """
         Check if connected to RabbitMQ message broker.
@@ -560,37 +647,24 @@ class MBListenerProxy(MBProxyBase):
         recv_heartbeat_ms=0,
         **kwargs,
     ):
-        # logger
-        self.logger = logger_utils.make_logger(base_logger, token=name, method_name="MBListenerProxy")
-        # name of message queue
-        self.name = name
-        # connection parameters
-        self.host_port_list = host_port_list
-        self.use_ssl = use_ssl
-        self.cert_file = cert_file
-        self.key_file = key_file
-        self.vhost = vhost
-        # original destination
-        self.orig_destination = destination
-        # lock for destination change
-        self.dest_lock = threading.Lock()
-        # destination to subscribe
-        self.destination = self.orig_destination
-        # destination used in retry
-        self.new_destination = self.orig_destination
-        # whether to freeze destination change (used when RabbitMQ not_found error occurs)
-        self._to_freeze_dest = False
-        # randomness
-        fqdn_pid = get_fqdn_pid()
-        tmp_timestamp_str = str(time.time())
-        random.seed(f"{fqdn_pid}:{tmp_timestamp_str}")
-        n_rand = random.randrange(10**6)
-        # subscription ID
-        self.sub_id = f"panda-MBListenerProxy_{fqdn_pid}_r{n_rand:06}"
-        # client ID
-        self.client_id = f"client_{self.sub_id}_{hex(id(self))}"
-        # connect parameters
-        self.connect_params = {"username": username, "passcode": passcode, "wait": wait, "headers": {"client-id": self.client_id}}
+        # initialize base class
+        super().__init__(
+            name=name,
+            host_port_list=host_port_list,
+            destination=destination,
+            use_ssl=use_ssl,
+            cert_file=cert_file,
+            key_file=key_file,
+            vhost=vhost,
+            username=username,
+            passcode=passcode,
+            wait=wait,
+            verbose=verbose,
+            keepalive=keepalive,
+            send_heartbeat_ms=send_heartbeat_ms,
+            recv_heartbeat_ms=recv_heartbeat_ms,
+            proxy_class_name="MBListenerProxy",
+        )
         # acknowledge mode
         self.ack_mode = ack_mode
         # associate message buffer
@@ -611,23 +685,8 @@ class MBListenerProxy(MBProxyBase):
         self.skip_buffer = skip_buffer
         # dump messages
         self.dump_msgs = []
-        # number of attempts to restart
-        self.n_restart = 0
-        # whether got connected from on_connected (thread-safe event)
-        self._got_connected_event = threading.Event()
-        # whether got disconnected from on_disconnected (thread-safe event)
-        self._got_disconnected_event = threading.Event()
-        # whether to disconnect intentionally
-        self.to_disconnect = False
-        # whether to log verbosely
-        self.verbose = verbose
         # prefetch count of the MB (max number of un-acknowledge messages allowed)
         self.prefetch_size = prefetch_size
-        # whether to enable keepalive
-        self.keepalive = keepalive
-        # sending and wanting-to-receive heartbeat period in microseconds
-        self.send_heartbeat_ms = send_heartbeat_ms
-        self.recv_heartbeat_ms = recv_heartbeat_ms
         # evaluate subscription headers
         self._evaluate_subscription_headers()
         # get connections
@@ -907,52 +966,24 @@ class MBSenderProxy(MBProxyBase):
         recv_heartbeat_ms=0,
         **kwargs,
     ):
-        # logger
-        self.logger = logger_utils.make_logger(base_logger, token=name, method_name="MBSenderProxy")
-        # name of message queue
-        self.name = name
-        # connection parameters
-        self.host_port_list = host_port_list
-        self.use_ssl = use_ssl
-        self.cert_file = cert_file
-        self.key_file = key_file
-        self.vhost = vhost
-        # original destination
-        self.orig_destination = destination
-        # lock for destination change
-        self.dest_lock = threading.Lock()
-        # destination to subscribe
-        self.destination = self.orig_destination
-        # destination used in retry
-        self.new_destination = self.orig_destination
-        # whether to freeze destination change (used when RabbitMQ not_found error occurs)
-        self._to_freeze_dest = False
-        # randomness
-        fqdn_pid = get_fqdn_pid()
-        tmp_timestamp_str = str(time.time())
-        random.seed(f"{fqdn_pid}:{tmp_timestamp_str}")
-        n_rand = random.randrange(10**6)
-        # subscription ID
-        self.sub_id = f"panda-MBSenderProxy_{fqdn_pid}_r{n_rand:06}"
-        # client ID
-        self.client_id = f"client_{self.sub_id}_{hex(id(self))}"
-        # connect parameters
-        self.connect_params = {"username": username, "passcode": passcode, "wait": wait, "headers": {"client-id": self.client_id}}
-        # number of attempts to restart
-        self.n_restart = 0
-        # whether got connected from on_connected (thread-safe event)
-        self._got_connected_event = threading.Event()
-        # whether got disconnected from on_disconnected (thread-safe event)
-        self._got_disconnected_event = threading.Event()
-        # whether to disconnect intentionally
-        self.to_disconnect = False
-        # whether to log verbosely
-        self.verbose = verbose
-        # whether to enable keepalive
-        self.keepalive = keepalive
-        # sending and wanting-to-receive heartbeat period in microseconds
-        self.send_heartbeat_ms = send_heartbeat_ms
-        self.recv_heartbeat_ms = recv_heartbeat_ms
+        # initialize base class
+        super().__init__(
+            name=name,
+            host_port_list=host_port_list,
+            destination=destination,
+            use_ssl=use_ssl,
+            cert_file=cert_file,
+            key_file=key_file,
+            vhost=vhost,
+            username=username,
+            passcode=passcode,
+            wait=wait,
+            verbose=verbose,
+            keepalive=keepalive,
+            send_heartbeat_ms=send_heartbeat_ms,
+            recv_heartbeat_ms=recv_heartbeat_ms,
+            proxy_class_name="MBSenderProxy",
+        )
         # instance lock for removers
         self.remover_lock = threading.Lock()
         # removers
