@@ -409,6 +409,62 @@ class MsgProcAgentBase(GenericThread):
     def _parse_config(self):
         """
         Parse message processor configuration JSON file.
+
+        The configuration file is a JSON document with (at least) the following
+        top-level keys:
+
+        - ``mb_servers`` (dict): Message broker server definitions.
+        - ``queues`` (dict): Queue and listener/sender definitions.
+        - ``processors`` (dict, optional): Processor plugin definitions.
+        - ``guard_period`` (number, optional): Guard period in seconds.
+
+        A typical configuration file looks like:
+
+        .. code-block:: json
+
+            {
+              "guard_period": 300,
+              "mb_servers": {
+                "main_broker": {
+                  "host": "broker.example.com",
+                  "port": 5672,
+                  "vhost": "/",
+                  "user": "panda",
+                  "password": "secret",
+                  "impl": "pandacommon.pandamsgbkr.msg_bkr_impl.RabbitMQImpl"
+                }
+              },
+              "queues": {
+                "task_queue": {
+                  "mb_server": "main_broker",
+                  "queue": "tasks",
+                  "exchange": "tasks-exchange",
+                  "routing_key": "tasks.key",
+                  "prefetch_count": 10,
+                  "listener": {
+                    "class": "pandacommon.pandamsgbkr.msg_listeners.TaskListener",
+                    "n_threads": 4
+                  },
+                  "sender": {
+                    "class": "pandacommon.pandamsgbkr.msg_senders.TaskSender"
+                  }
+                }
+              },
+              "processors": {
+                "task_processor": {
+                  "class": "pandacommon.pandamsgbkr.msg_processors.TaskProcessor",
+                  "queues": ["task_queue"],
+                  "config": {
+                    "max_retries": 3,
+                    "retry_delay": 60
+                  }
+                }
+              }
+            }
+
+        Only the subset of fields accessed in this method is mandatory:
+        ``mb_servers`` and ``queues`` are required, ``processors`` and
+        ``guard_period`` are optional.
         """
         # logger
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="_parse_config")
