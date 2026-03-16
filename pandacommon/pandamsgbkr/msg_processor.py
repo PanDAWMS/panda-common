@@ -669,6 +669,7 @@ class MsgProcAgentBase(GenericThread):
         tmp_logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="_spawn_processors")
         tmp_logger.debug("start")
         for processor_id in processor_list:
+            attr_dict = {}
             try:
                 processor_name, thread_j = processor_id
                 attr_dict = self.processor_attr_map[processor_name]
@@ -683,7 +684,7 @@ class MsgProcAgentBase(GenericThread):
                 )
             except Exception as e:
                 tmp_logger.error(
-                    f"failed to spawn processor thread {processor_id} with plugin={attr_dict['plugin_class_name']} , in_q={attr_dict['in_queue']}, out_q={attr_dict['out_queue']} ; {e.__class__.__name__}: {e} "
+                    f"failed to spawn processor thread {processor_id} with plugin={attr_dict.get('plugin_class_name')} , in_q={attr_dict.get('in_queue')}, out_q={attr_dict.get('out_queue')} ; {e.__class__.__name__}: {e} "
                 )
         tmp_logger.debug("done")
 
