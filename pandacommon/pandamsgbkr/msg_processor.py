@@ -179,7 +179,7 @@ class SimpleMsgProcThread(GenericThread):
 
     def run(self):
         """
-        Main thread execution loop for multi-message processing.
+        Main thread execution loop for simple message processing.
         """
         # update logger thread id
         self.logger = logger_utils.make_logger(base_logger, token=self.get_pid(), method_name="SimpleMsgProcThread")
