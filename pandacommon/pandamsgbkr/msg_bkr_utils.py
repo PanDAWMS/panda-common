@@ -1,6 +1,7 @@
 import collections
 import copy
 import datetime
+import logging
 import os
 import random
 import re
@@ -21,7 +22,7 @@ base_logger = logger_utils.setup_logger("msg_bkr_utils")
 # adjust stomp logger
 stomp_log_level = "INFO"
 panda_stomp_logger = logger_utils.setup_logger("stomp.py")
-stomp_logger = stomp.logging.__logger
+stomp_logger = logging.getLogger("stomp")
 for handler in stomp_logger.handlers.copy():
     handler.close()
     stomp_logger.removeHandler(handler)
