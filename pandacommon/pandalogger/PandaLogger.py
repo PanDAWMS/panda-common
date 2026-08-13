@@ -268,6 +268,8 @@ class PandaLogger:
 
     def getLogger(self, log_name, log_level=None):
         log_h, new_log_flag = getLoggerWrapper("panda.log.%s" % log_name, True)
+        if not new_log_flag:
+            return log_h
         log_h.propagate = False
         tmp_attr = "rotating_policy"
 
