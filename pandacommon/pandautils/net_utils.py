@@ -2,15 +2,11 @@ import copy
 import os
 import random
 import socket
+from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.connection import allowed_gai_family
-
-try:
-    from urllib.parse import urlparse
-except ImportError:
-    from urlparse import urlparse
 
 from .thread_utils import MapWithLockAndTimeout
 

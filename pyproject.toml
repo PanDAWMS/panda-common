@@ -13,12 +13,11 @@ authors = [
     { name = "PanDA Team", email = "panda-support@cern.ch" },
 ]
 dependencies = [
-    "configparser",
     "pytz",
     "requests",
     "stomp.py >=8.1.2",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 [project.urls]
 Homepage = "https://panda-wms.readthedocs.io/en/latest/"

@@ -1,21 +1,13 @@
+import http.client
 import json
 import logging
 import logging.handlers
 import os
 import threading
 import time
+from urllib.parse import urlencode
 
 from . import logger_config
-
-try:
-    import http.client as httplib
-except ImportError:
-    import httplib
-try:
-    from urllib.parse import urlencode
-except ImportError:
-    from urllib import urlencode
-
 
 # encodings
 JSON = "json"
@@ -73,7 +65,7 @@ class _Emitter(threading.Thread):
     def run(self):
         # send the record to the Web server as an URL-encoded dictionary
         try:
-            connection = httplib.HTTPConnection(self.host, self.port, timeout=1)
+            connection = http.client.HTTPConnection(self.host, self.port, timeout=1)
             url = self.url
             if self.method == "GET":
                 if url.find("?") >= 0:

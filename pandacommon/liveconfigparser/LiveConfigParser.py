@@ -17,16 +17,8 @@
 
 import os
 import re
-
-try:
-    from urllib.request import urlopen
-except ImportError:
-    from urllib2 import urlopen
-
-try:
-    from configparser import ConfigParser, NoSectionError
-except ImportError:
-    from ConfigParser import ConfigParser, NoSectionError
+from configparser import ConfigParser, NoSectionError
+from urllib.request import urlopen
 
 
 class LiveConfigParser(ConfigParser):
