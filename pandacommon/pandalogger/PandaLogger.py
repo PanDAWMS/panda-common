@@ -31,10 +31,10 @@ def getLoggerWrapper(logger_name: str, checkNew: Literal[False] = False) -> logg
 
 
 @overload
-def getLoggerWrapper(logger_name: str, checkNew: Literal[True]) -> "tuple[logging.Logger, bool]": ...
+def getLoggerWrapper(logger_name: str, checkNew: Literal[True]) -> tuple[logging.Logger, bool]: ...
 
 
-def getLoggerWrapper(logger_name: str, checkNew: bool = False) -> "logging.Logger | tuple[logging.Logger, bool]":
+def getLoggerWrapper(logger_name: str, checkNew: bool = False) -> logging.Logger | tuple[logging.Logger, bool]:
     loggerMapLock.acquire()
     global loggerMap
     new_flag = False

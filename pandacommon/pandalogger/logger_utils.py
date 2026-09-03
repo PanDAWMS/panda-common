@@ -49,7 +49,7 @@ def make_logger(tmp_log: logging.Logger, token: str | None = None, method_name: 
 
 
 # dump error message
-def dump_error_message(tmp_log: "logging.Logger | LogWrapper", err_str: str | None = None, no_message: bool = False) -> str:
+def dump_error_message(tmp_log: logging.Logger | LogWrapper, err_str: str | None = None, no_message: bool = False) -> str:
     if not isinstance(tmp_log, LogWrapper):
         method_name = "{0} : ".format(inspect.stack()[1][3])
     else:

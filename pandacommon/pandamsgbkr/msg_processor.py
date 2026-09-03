@@ -41,7 +41,7 @@ def get_mb_proxy(name: str, sconf: dict[str, Any], qconf: dict[str, Any], mode: 
         MBListenerProxy or MBSenderProxy instance based on mode.
     """
     # class of mb proxy
-    the_class: "type[MBListenerProxy] | type[MBSenderProxy]" = MBListenerProxy
+    the_class: type[MBListenerProxy] | type[MBSenderProxy] = MBListenerProxy
     if mode == "sender":
         the_class = MBSenderProxy
     # resolve env variables if any

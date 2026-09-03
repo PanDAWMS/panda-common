@@ -22,7 +22,7 @@ dnsMap = MapWithLockAndTimeout()
 # HTTP adaptor with randomized DNS resolution
 class HTTPAdapterWithRandomDnsResolver(HTTPAdapter):
     # override to get connection to random host
-    def get_connection(self, url: "str | bytes", proxies: Mapping[str, str] | None = None) -> Any:
+    def get_connection(self, url: str | bytes, proxies: Mapping[str, str] | None = None) -> Any:
         # requests allows a bytes URL here. Everything below rebuilds the URL as text, and
         # urlparse on bytes would give bytes components that will not take a str hostname
         url_str = url.decode() if isinstance(url, bytes) else url
