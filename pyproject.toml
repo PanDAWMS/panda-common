@@ -16,6 +16,7 @@ dependencies = [
     "pytz",
     "requests",
     "stomp.py >=8.1.2",
+    "urllib3",
 ]
 requires-python = ">=3.10"
 
