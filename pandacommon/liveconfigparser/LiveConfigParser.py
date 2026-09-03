@@ -87,8 +87,7 @@ def expand_values(target, values_dict):
             tmp_val = None
 
         # number like 1, 123, 99999
-        # pylint: disable=W1401
-        elif isinstance(tmp_val, str) and re.match("^\d+$", tmp_val):
+        elif isinstance(tmp_val, str) and re.match(r"^\d+$", tmp_val):
             tmp_val = int(tmp_val)
 
         # update dict
