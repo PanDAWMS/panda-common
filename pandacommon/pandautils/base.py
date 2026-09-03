@@ -7,6 +7,7 @@ class SpecBase(object):
     """
     Base class of specification
     """
+
     # attributes
     attributes = ()
     # attributes which have 0 by default
@@ -23,7 +24,7 @@ class SpecBase(object):
             self._orig_setattr(attr, None)
         # map of changed attributes
         self._orig_setattr("_changedAttrs", {})
-    
+
     # override __setattr__ to collect the changed attributes
     def __setattr__(self, name, value):
         oldVal = getattr(self, name)

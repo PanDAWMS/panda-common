@@ -9,6 +9,7 @@ import json
 import socket
 
 from confluent_kafka import Producer
+
 from pandacommon.commonconfig import common_config
 from pandacommon.pandalogger import logger_utils
 
