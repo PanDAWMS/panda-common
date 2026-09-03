@@ -56,6 +56,18 @@ exclude = [
 [tool.black]
 line-length=160
 
+# The tree is clean under these flags and CI fails on any finding, so a change that
+# introduces one has to fix it. These match panda-server's [tool.mypy]; keep them and
+# the pins in .github/workflows/syntax-check.yml aligned with that repository, because
+# it type checks against the annotations here.
+[tool.mypy]
+files = ["pandacommon"]
+ignore_missing_imports = true
+# Without this, mypy skips the body of every function that has no annotations. The
+# modules panda-server imports are annotated; the rest are not, and this is what covers
+# them.
+check_untyped_defs = true
+
 [tool.autopep8]
 # https://pypi.org/project/autopep8/#pyproject-toml
 max_line_length = 160
