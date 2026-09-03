@@ -1,4 +1,5 @@
 import threading
+from typing import Any
 
 from pandacommon.pandalogger import logger_utils
 
@@ -12,11 +13,11 @@ class PluginFactory(object):
     __lock = threading.Lock()
 
     # constructor
-    def __init__(self):
-        self.classMap = {}
+    def __init__(self) -> None:
+        self.classMap: dict[str, Any] = {}
 
     # get plugin
-    def get_plugin(self, plugin_conf):
+    def get_plugin(self, plugin_conf: dict[str, Any]) -> Any:
         # logger
         tmp_log = logger_utils.make_logger(base_logger, method_name="get_plugin")
 
@@ -25,7 +26,7 @@ class PluginFactory(object):
         class_name = plugin_conf["name"]
         plugin_params = plugin_conf.get("params", {})
         if module_name is None or class_name is None:
-            tmp_log.warning("Invalid plugin; either module or name is missing ".format(module_name))
+            tmp_log.warning("Invalid plugin; either module or name is missing in {0}".format(plugin_conf))
             return None
         plugin_key = "{0}.{1}".format(module_name, class_name)
         # get class

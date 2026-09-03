@@ -18,18 +18,20 @@
 import os
 import re
 from configparser import ConfigParser, NoSectionError
+from types import ModuleType
+from typing import Any
 from urllib.request import urlopen
 
 
 class LiveConfigParser(ConfigParser):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         ConfigParser.__init__(self, *args, **kwargs)
 
     # We want to retain case sensitivity
-    def optionxform(self, optionstr):
+    def optionxform(self, optionstr: str) -> str:
         return optionstr
 
-    def __getattr__(self, attribute):
+    def __getattr__(self, attribute: str) -> dict[str, str]:
         try:
             i = self.items(attribute)
             attr_dict = {}
@@ -39,8 +41,10 @@ class LiveConfigParser(ConfigParser):
         except NoSectionError:
             raise AttributeError("ConfigParser instance has no attribute '%s'" % attribute)
 
-    # search for configs in standard places and read them
-    def read(self, file_name, config_url=None):
+    # search for configs in standard places and read them. This deliberately does not match
+    # ConfigParser.read: it takes one bare file name, looks it up in the standard PanDA
+    # locations, and returns nothing
+    def read(self, file_name: str, config_url: str | None = None) -> None:  # type: ignore[override]
         config_files = [
             # system
             "/etc/panda/%s" % file_name,
@@ -64,7 +68,7 @@ class LiveConfigParser(ConfigParser):
 
 
 # expand values
-def expand_values(target, values_dict):
+def expand_values(target: ModuleType, values_dict: dict[str, Any]) -> None:
     for tmp_key in values_dict:
         tmp_val = values_dict[tmp_key]
 

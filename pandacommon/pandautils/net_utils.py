@@ -2,11 +2,16 @@ import copy
 import os
 import random
 import socket
+from collections.abc import Mapping
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.connection import allowed_gai_family
+
+# requests.packages is a legacy alias for the top-level urllib3, and only the latter ships
+# type information
+from urllib3.util.connection import allowed_gai_family
 
 from .thread_utils import MapWithLockAndTimeout
 
@@ -17,16 +22,17 @@ dnsMap = MapWithLockAndTimeout()
 # HTTP adaptor with randomized DNS resolution
 class HTTPAdapterWithRandomDnsResolver(HTTPAdapter):
     # override to get connection to random host
-    def get_connection(self, url, proxies=None):
+    def get_connection(self, url: "str | bytes", proxies: Mapping[str, str] | None = None) -> Any:
+        # requests allows a bytes URL here. Everything below rebuilds the URL as text, and
+        # urlparse on bytes would give bytes components that will not take a str hostname
+        url_str = url.decode() if isinstance(url, bytes) else url
         # resolve cname to hostnames
-        dns_records = resolve_host_in_url(url)
+        dns_records = resolve_host_in_url(url_str)
         random.shuffle(dns_records)
-        # parse URL
-        parsed = urlparse(url)
         # loop over all hosts
         err = None
         for hostname in dns_records:
-            tmp_url = replace_hostname_in_url(url, hostname)
+            tmp_url = replace_hostname_in_url(url_str, hostname)
             try:
                 con = HTTPAdapter.get_connection(self, tmp_url, proxies=proxies)
                 # return if valid

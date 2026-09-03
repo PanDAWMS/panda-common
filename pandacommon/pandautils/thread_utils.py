@@ -4,15 +4,16 @@ import os
 import random
 import socket
 import threading
+from typing import Any
 
 
 class GenericThread(threading.Thread):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         threading.Thread.__init__(self, **kwargs)
         self.hostname = socket.gethostname()
         self.os_pid = os.getpid()
 
-    def get_thread_id(self, current=False):
+    def get_thread_id(self, current: bool = False) -> int:
         """
         get thread identifier
         """
@@ -25,14 +26,14 @@ class GenericThread(threading.Thread):
 
         return thread_id
 
-    def get_pid(self, current=False):
+    def get_pid(self, current: bool = False) -> str:
         """
         get host/process/thread identifier
         """
         thread_id = self.get_thread_id(current)
         return "{0}_{1}-{2}".format(self.hostname, self.os_pid, format(thread_id, "x"))
 
-    def get_full_id(self, module_name, file_name):
+    def get_full_id(self, module_name: str, file_name: str) -> str:
         """
         combines the host/process/thread identifier with the module information
         """
@@ -49,7 +50,7 @@ class GenericThread(threading.Thread):
 
 # map with lock
 class MapWithLockAndTimeout(dict):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # set timeout
         if "timeout" in kwargs:
             self.timeout = kwargs["timeout"]
@@ -60,17 +61,17 @@ class MapWithLockAndTimeout(dict):
         dict.__init__(self, *args, **kwargs)
 
     # get item regardless of freshness to avoid race-condition in check->get
-    def __getitem__(self, item):
+    def __getitem__(self, item: Any) -> Any:
         with self.lock:
             ret = dict.__getitem__(self, item)
             return ret["data"]
 
-    def __setitem__(self, item, value):
+    def __setitem__(self, item: Any, value: Any) -> None:
         with self.lock:
             dict.__setitem__(self, item, {"time_stamp": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), "data": value})
 
     # check data by taking freshness into account
-    def __contains__(self, item):
+    def __contains__(self, item: object) -> bool:
         with self.lock:
             try:
                 ret = dict.__getitem__(self, item)
@@ -83,14 +84,16 @@ class MapWithLockAndTimeout(dict):
 
 # weighted lists
 class WeightedLists(object):
-    def __init__(self, lock):
+    # lock is accepted and ignored: this class makes its own. Kept in the signature
+    # because callers pass one, e.g. add_main.py in panda-server
+    def __init__(self, lock: Any) -> None:
         self.lock = multiprocessing.Lock()
-        self.data = multiprocessing.Queue()
+        self.data: "multiprocessing.Queue[dict[int, list[Any]]]" = multiprocessing.Queue()
         self.data.put(dict())
-        self.weights = multiprocessing.Queue()
+        self.weights: "multiprocessing.Queue[dict[int, float]]" = multiprocessing.Queue()
         self.weights.put(dict())
 
-    def __len__(self):
+    def __len__(self) -> int:
         with self.lock:
             len_data = 0
             data = self.data.get()
@@ -99,7 +102,7 @@ class WeightedLists(object):
             self.data.put(data)
             return len_data
 
-    def add(self, weight, list_data):
+    def add(self, weight: float, list_data: list[Any]) -> None:
         if not list_data or weight <= 0:
             return
         with self.lock:
@@ -111,7 +114,7 @@ class WeightedLists(object):
             self.weights.put(weights)
             self.data.put(data)
 
-    def pop(self):
+    def pop(self) -> Any:
         with self.lock:
             weights = self.weights.get()
             if not weights:
@@ -131,7 +134,7 @@ class WeightedLists(object):
 
 # lock pool
 class LockPool(object):
-    def __init__(self, pool_size=100):
+    def __init__(self, pool_size: int = 100) -> None:
         self.pool_size = pool_size
         self.lock = multiprocessing.Lock()
         self.manager = multiprocessing.Manager()
@@ -139,7 +142,7 @@ class LockPool(object):
         self.lock_ref_count = self.manager.dict()
         self.lock_pool = {i: multiprocessing.Lock() for i in range(pool_size)}
 
-    def get(self, key):
+    def get(self, key: Any) -> Any:
         with self.lock:
             if key not in self.key_to_lock:
                 in_used = set(self.key_to_lock.values())
@@ -154,7 +157,7 @@ class LockPool(object):
                 self.lock_ref_count[index] += 1
             return self.lock_pool[index]
 
-    def release(self, key):
+    def release(self, key: Any) -> None:
         with self.lock:
             if key not in self.key_to_lock:
                 return

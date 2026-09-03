@@ -1,11 +1,12 @@
 import re
 import sys
+from typing import Any
 
 from pandacommon.liveconfigparser.LiveConfigParser import LiveConfigParser
 
 
 # expand config parameters to module attributes
-def expandConfig(config_file_name, section_name, module_name):
+def expandConfig(config_file_name: str, section_name: str, module_name: str) -> None:
     try:
         # get ConfigParser
         tmp_conf = LiveConfigParser()
@@ -14,7 +15,7 @@ def expandConfig(config_file_name, section_name, module_name):
         tmp_conf.read(config_file_name)
 
         # get section
-        tmp_dict = getattr(tmp_conf, section_name)
+        tmp_dict: dict[str, Any] = getattr(tmp_conf, section_name)
         tmp_self = sys.modules[module_name]
 
         for tmp_key, tmp_val in tmp_dict.items():
