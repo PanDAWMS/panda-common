@@ -1,12 +1,22 @@
 import datetime
+import logging
 import resource
+from typing import Any
 
 from .PandaLogger import PandaLogger
 
 
 # wrapper to set prefix to logging messages
 class LogWrapper:
-    def __init__(self, log, prefix="", lineLimit=100, monToken=None, seeMem=False, hook=None):
+    def __init__(
+        self,
+        log: logging.Logger,
+        prefix: str | None = "",
+        lineLimit: int = 100,
+        monToken: str | None = None,
+        seeMem: bool = False,
+        hook: Any = None,
+    ) -> None:
         # use timestamp as prefix
         if prefix is None:
             self.prefix = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat("/")
@@ -15,7 +25,7 @@ class LogWrapper:
         # logger instance
         self.logger = log
         # message buffer
-        self.msg_buffer = []
+        self.msg_buffer: list[str] = []
         self.line_limit = lineLimit
         # token for monitor
         if monToken is not None:
@@ -30,17 +40,17 @@ class LogWrapper:
             self.name = ""
 
     # get memory usage
-    def getMemoryUsage(self):
+    def getMemoryUsage(self) -> str:
         return " (mem usage {0} MB)".format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024)
 
-    def keepMsg(self, msg):
+    def keepMsg(self, msg: str) -> None:
         # keep max message depth
         if len(self.msg_buffer) > self.line_limit:
             self.msg_buffer.pop(0)
         timeNow = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         self.msg_buffer.append("{0} : {1}".format(timeNow.isoformat(" "), msg))
 
-    def debug(self, msg):
+    def debug(self, msg: Any) -> None:
         msg = str(msg)
         self.keepMsg(msg)
         try:
@@ -54,7 +64,7 @@ class LogWrapper:
             msg += self.getMemoryUsage()
         self.logger.debug(msg)
 
-    def info(self, msg):
+    def info(self, msg: Any) -> None:
         msg = str(msg)
         self.keepMsg(msg)
         try:
@@ -68,7 +78,7 @@ class LogWrapper:
             msg += self.getMemoryUsage()
         self.logger.info(msg)
 
-    def error(self, msg):
+    def error(self, msg: Any) -> None:
         msg = str(msg)
         self.keepMsg(msg)
         try:
@@ -82,7 +92,7 @@ class LogWrapper:
             msg += self.getMemoryUsage()
         self.logger.error(msg)
 
-    def warning(self, msg):
+    def warning(self, msg: Any) -> None:
         msg = str(msg)
         self.keepMsg(msg)
         try:
@@ -96,7 +106,7 @@ class LogWrapper:
             msg += self.getMemoryUsage()
         self.logger.warning(msg)
 
-    def critical(self, msg):
+    def critical(self, msg: Any) -> None:
         msg = str(msg)
         self.keepMsg(msg)
         try:
@@ -110,7 +120,7 @@ class LogWrapper:
             msg += self.getMemoryUsage()
         self.logger.critical(msg)
 
-    def dumpToString(self):
+    def dumpToString(self) -> str:
         str_msg = ""
         for msg in self.msg_buffer:
             str_msg += msg
@@ -118,7 +128,7 @@ class LogWrapper:
         return str_msg
 
     # send message to logger
-    def sendMsg(self, message, logger_name, msg_type, msgLevel="info"):
+    def sendMsg(self, message: str, logger_name: str, msg_type: str, msgLevel: str = "info") -> None:
         try:
             # get logger
             tmp_panda_logger = PandaLogger()

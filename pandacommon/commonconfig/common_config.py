@@ -10,5 +10,5 @@ tmpConf.read("panda_common.cfg")
 
 
 # get section
-def get(section):
+def get(section: str) -> dict[str, str]:
     return getattr(tmpConf, section)
