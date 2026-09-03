@@ -71,8 +71,8 @@ def _get_connection_dict(
     # resolve all distinct hosts behind hostname
     resolved_host_port_set = set()
     for host_port in host_port_list:
-        host, port = host_port.split(":")
-        port = int(port)
+        host, port_str = host_port.split(":")
+        port = int(port_str)
         addrinfos = socket.getaddrinfo(host, port)
         for addrinfo in addrinfos:
             resolved_host = socket.getfqdn(addrinfo[4][0])
@@ -125,6 +125,10 @@ class MsgBuffer:
     """
     Global message buffer. Singleton for each queue name
     """
+
+    # installed by _initialize, which __new__ runs once per queue name
+    queue_name: str
+    __fifo: "collections.deque[MsgObj]"
 
     @staticmethod
     def _initialize(self: "MsgBuffer", queue_name: str):
@@ -203,7 +207,7 @@ class MsgObj(object):
 
     __slots__ = ("__mb_proxy", "conn_id", "sub_id", "msg_id", "ack_id", "data", "is_transacted", "txs_id")
 
-    def __init__(self, mb_proxy: "MBProxyBase", conn_id: str, msg_id: str, ack_id: str | None, data: str, is_transacted: bool = True):
+    def __init__(self, mb_proxy: "MBListenerProxy", conn_id: str, msg_id: str, ack_id: str | None, data: str, is_transacted: bool = True):
         """
         Initialize MsgObj instance.
 
@@ -316,6 +320,8 @@ class MsgListener(stomp.ConnectionListener):
             headers, message = args
             return None, headers, message
 
+        raise ValueError(f"cannot parse {len(args)} arguments from the stomp callback")
+
     def on_error(self, *args):
         """
         Handle error message from message broker.
@@ -385,6 +391,15 @@ class MBProxyBase:
     """
     Base MBProxy class
     """
+
+    # Defined by every subclass and called from here: MsgListener.on_message reaches
+    # _on_message through this class, and _on_error restarts through restart()
+
+    def _on_message(self, headers: dict, body: str, conn_id: str) -> None:
+        raise NotImplementedError
+
+    def restart(self) -> None:
+        raise NotImplementedError
 
     def __init__(
         self,
@@ -478,7 +493,9 @@ class MBProxyBase:
         Returns:
             True if connected to RabbitMQ, False otherwise.
         """
-        return getattr(self, "mq_server", None) and self.mq_server.startswith("RabbitMQ/")
+        # mq_server is only set once a CONNECTED frame names the server
+        mq_server: str | None = getattr(self, "mq_server", None)
+        return mq_server is not None and mq_server.startswith("RabbitMQ/")
 
     @property
     def got_connected(self) -> bool:
@@ -728,7 +745,7 @@ class MBListenerProxy(MBProxyBase):
         conn.abort(txs_id)
         self.logger.warning(f"{conn_id} txid={txs_id} ABORT")
 
-    def _ack(self, conn_id: str, msg_id: str, ack_id: str):
+    def _ack(self, conn_id: str, msg_id: str, ack_id: str | None):
         """
         Acknowledge a message.
 
@@ -743,7 +760,7 @@ class MBListenerProxy(MBProxyBase):
             if self.verbose:
                 self.logger.debug(f"{conn_id} {msg_id} {ack_id} ACK")
 
-    def _nack(self, conn_id: str, msg_id: str, ack_id: str):
+    def _nack(self, conn_id: str, msg_id: str, ack_id: str | None):
         """
         Negatively acknowledge a message.
 
