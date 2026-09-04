@@ -17,48 +17,28 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-      with:
-        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v7
       with:
         python-version: '3.11'
 
-    - name: Check syntax of changed files
-      run: |
-        files=$(git diff --name-only origin/master...HEAD -- '*.py')
-        if [ -n "$files" ]; then
-          echo "$files" | xargs -n1 python -m py_compile
-        else
-          echo "No Python files changed."
-        fi
+    - name: Cache pre-commit environments
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ runner.os }}-py3.11-${{ hashFiles('.pre-commit-config.yaml') }}
 
-    # py_compile only parses, so a name that does not exist compiles fine and
-    # raises at import time instead. Type annotations make this easy to hit,
-    # because the class named in one has to be imported even though nothing
-    # calls it.
-    - name: Install ruff
-      run: pip install 'ruff==0.14.5'
-
-    - name: Check for undefined names
-      run: ruff check --isolated --select F821 .
-
-    # This package declares py.typed, so its annotations are what panda-server
-    # and every other consumer type check against. A finding here is a finding
-    # they cannot see and cannot fix.
+    # What is checked, and at which versions, is defined once in
+    # .pre-commit-config.yaml. This job only runs it, so a contributor who runs
+    # `pre-commit run --all-files` gets this job's result before opening the PR.
+    # Do not add a tool here without adding it there.
     #
-    # The tree is clean under these flags, so the gate is mypy itself: any
-    # finding fails the step. Do not swap it for a count -- annotating a
-    # function turns on checking of its whole body, so improving annotations can
-    # raise the number before it lowers it. With zero as the bar that goes away.
-    #
-    # mypy, the stubs and ruff are pinned to the same versions panda-server
-    # uses, and for the same reason: the stubs are part of what the run sees, so
-    # an unpinned upgrade would produce findings without a code change. When
-    # upgrading either, fix what the new version reports in the same PR, and
-    # keep the two repositories on the same pins.
-    - name: Type check
+    # This replaced a py_compile step over the changed files. That step is
+    # covered by the ruff hook: ruff reports syntax errors whatever rules are
+    # selected, it scans the whole tree rather than the diff, and no tracked
+    # .py file sits under one of its default excludes.
+    - name: Run pre-commit
       run: |
-        pip install 'mypy==1.13.0' 'types-requests==2.33.0.20260712' 'types-pytz==2026.3.1.20260727'
-        mypy
+        pip install 'pre-commit==4.6.2'
+        pre-commit run --all-files --show-diff-on-failure

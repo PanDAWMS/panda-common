@@ -11,3 +11,50 @@ repos:
     hooks:
     -   id: isort
         name: isort (python)
+
+# A name that does not exist parses fine and raises at import time instead. Type
+# annotations make this easy to hit, because the class named in one has to be imported
+# even though nothing calls it.
+#
+# The whole tree, not just the staged files: the scan takes hundredths of a second, and
+# a name can be broken by an edit somewhere else -- a renamed import, a deleted helper,
+# a moved class.
+#
+# --isolated means this run ignores [tool.ruff] in pyproject.toml entirely: an exclude
+# or a target-version added there would have no effect here. That is inherited from the
+# CI step this replaced, and is worth revisiting if the rule selection ever moves into
+# pyproject.
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.5
+    hooks:
+    -   id: ruff-check
+        name: ruff (undefined names)
+        args: [--isolated, --select, F821, .]
+        pass_filenames: false
+
+# This package declares py.typed, so its annotations are what panda-server and every
+# other consumer type check against.
+#
+# The tree is clean under these flags, so the gate is mypy itself: any finding fails.
+# Do not swap it for a count -- annotating a function turns on checking of its whole
+# body, so improving annotations can raise the number before it lowers it. With zero as
+# the bar that goes away.
+#
+# pass_filenames is off so this runs `mypy` with no arguments: the file list comes from
+# [tool.mypy] in pyproject.toml. Handing it the staged files instead would both miss
+# files that an edit elsewhere breaks and change which flags apply. args is emptied for
+# the same reason -- this mirror defaults to passing --ignore-missing-imports and
+# --scripts-are-modules, and the settings belong in pyproject.
+#
+# mypy and the stubs are pinned together: the stubs are part of what the run sees, so
+# an unpinned upgrade would produce findings without a code change. When upgrading
+# either, fix what the new version reports in the same PR.
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+    -   id: mypy
+        args: []
+        additional_dependencies:
+        -   types-requests==2.33.0.20260712
+        -   types-pytz==2026.3.1.20260727
+        pass_filenames: false
