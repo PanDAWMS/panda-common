@@ -592,7 +592,7 @@ class MBProxyBase:
                 self._to_freeze_dest = True
             self.logger.debug(f"_on_error : got not_found from RabbitMQ; modified new destination into {self.new_destination} ; restarting")
             self.restart()
-            self.logger.debug(f"_on_error : restarted")
+            self.logger.debug("_on_error : restarted")
 
 
 # message broker proxy for receiver
