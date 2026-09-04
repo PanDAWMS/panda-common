@@ -3,7 +3,7 @@ import os
 import random
 import socket
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import requests
@@ -83,7 +83,10 @@ def resolve_host_in_url(url: str) -> list[str]:
     else:
         family = allowed_gai_family()
         dns_records = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
-        dns_records = list(set([socket.getfqdn(record[4][0]) for record in dns_records]))
+        # the sockaddr is annotated as a union that includes tuple[int, bytes], for the
+        # link-layer families, so its first element is str | int. allowed_gai_family
+        # returns AF_INET or AF_INET6, and neither yields that member
+        dns_records = list(set([socket.getfqdn(cast(str, record[4][0])) for record in dns_records]))
         dnsMap[parsed.hostname] = dns_records
     return copy.copy(dns_records)
 

@@ -50,7 +50,7 @@ repos:
 # an unpinned upgrade would produce findings without a code change. When upgrading
 # either, fix what the new version reports in the same PR.
 -   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v2.3.1
     hooks:
     -   id: mypy
         args: []

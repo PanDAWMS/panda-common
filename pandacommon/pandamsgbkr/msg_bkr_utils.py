@@ -11,6 +11,7 @@ import threading
 import time
 import traceback
 import uuid
+from typing import cast
 
 import stomp
 
@@ -35,8 +36,9 @@ stomp_logger.propagate = False
 # global lock
 _GLOBAL_LOCK = threading.Lock()
 
-# global map of message buffers
-_BUFFER_MAP = {}
+# global map of message buffers, keyed by queue name. MsgBuffer is defined further down,
+# so the reference has to stay quoted: this annotation is evaluated at import time
+_BUFFER_MAP: dict[str, "MsgBuffer"] = {}
 
 
 # get connection dict
@@ -75,7 +77,10 @@ def _get_connection_dict(
         port = int(port_str)
         addrinfos = socket.getaddrinfo(host, port)
         for addrinfo in addrinfos:
-            resolved_host = socket.getfqdn(addrinfo[4][0])
+            # the sockaddr is annotated as a union that includes tuple[int, bytes], for
+            # the link-layer families, so its first element is str | int. Resolving a
+            # host and port yields neither of those families
+            resolved_host = socket.getfqdn(cast(str, addrinfo[4][0]))
             resolved_host_port_set.add((resolved_host, port))
     # make connections
     for host, port in resolved_host_port_set:
