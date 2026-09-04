@@ -71,17 +71,36 @@ line-length = 160
 select = ["F", "I"]
 
 # The tree is clean under these flags and CI fails on any finding, so a change that
-# introduces one has to fix it. These match panda-server's [tool.mypy]. Keeping them and
-# the pins in .pre-commit-config.yaml aligned with that repository is a convenience, not
-# a requirement: its CI does not install this package, so the annotations here are Any to
-# it. What alignment buys is that an upgrade is worked out once rather than twice.
+# introduces one has to fix it.
+#
+# These are deliberately stricter than panda-server's [tool.mypy], which is still on the
+# two flags below. This package is small enough to be the pilot: the same gate there costs
+# about 2900 findings for disallow_untyped_defs and 290 for disallow_any_generics, so what
+# it takes to clear 89 here is what sizes that work. The pins in .pre-commit-config.yaml
+# stay aligned with that repository so an upgrade is worked out once rather than twice.
+#
+# Annotation coverage is not only for consumers of this package. bamboo builds its PanDA
+# code map by reading annotations out of the source with ast, and its own policy says so:
+# "when a shape cannot be resolved from evidence, the answer is a standard type annotation
+# in PanDA (kept honest by its own CI), not another inference mechanism here." Every
+# annotation that states a real element type is inference it does not have to guess at.
 [tool.mypy]
 files = ["pandacommon"]
 ignore_missing_imports = true
-# Without this, mypy skips the body of every function that has no annotations. The
-# modules panda-server imports are annotated; the rest are not, and this is what covers
-# them.
+# Without this, mypy skips the body of every function that has no annotations. It is
+# redundant while disallow_untyped_defs leaves no such function, and kept because a
+# per-module override that relaxes that flag would put those bodies back in scope.
 check_untyped_defs = true
+# Coverage: every function states its parameters and its return. disallow_incomplete_defs
+# closes the half-annotated case, which the coverage flag alone leaves open.
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+# Precision: a bare dict says nothing about what it holds, and saying what a container
+# holds is most of what the code map wants out of an annotation.
+disallow_any_generics = true
+# Without this, a function annotated -> dict[str, JobSpec] can return Any, and the
+# annotation becomes a claim that nothing checks.
+warn_return_any = true
 
 [tool.autopep8]
 # https://pypi.org/project/autopep8/#pyproject-toml

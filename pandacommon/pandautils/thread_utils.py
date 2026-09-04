@@ -4,7 +4,7 @@ import os
 import random
 import socket
 import threading
-from typing import Any
+from typing import Any, TypedDict
 
 
 class GenericThread(threading.Thread):
@@ -48,8 +48,22 @@ class GenericThread(threading.Thread):
         return full_id
 
 
+class _TimedEntry(TypedDict):
+    """What MapWithLockAndTimeout stores per key.
+
+    The value the caller set, plus when it was set: the timestamp is what makes the
+    freshness check in __contains__ possible, and it is why the stored shape is not the
+    value itself.
+    """
+
+    time_stamp: datetime.datetime
+    data: Any
+
+
 # map with lock
-class MapWithLockAndTimeout(dict):
+# The key type is left open because nothing about the class constrains it; the value type
+# is the informative half, and it is the wrapper above rather than what the caller sets.
+class MapWithLockAndTimeout(dict[Any, _TimedEntry]):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         # set timeout
         if "timeout" in kwargs:
@@ -68,7 +82,10 @@ class MapWithLockAndTimeout(dict):
 
     def __setitem__(self, item: Any, value: Any) -> None:
         with self.lock:
-            dict.__setitem__(self, item, {"time_stamp": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), "data": value})
+            # named so the literal has a declared type to be checked against; passed
+            # straight to dict.__setitem__ it would have none
+            entry: _TimedEntry = {"time_stamp": datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), "data": value}
+            dict.__setitem__(self, item, entry)
 
     # check data by taking freshness into account
     def __contains__(self, item: object) -> bool:

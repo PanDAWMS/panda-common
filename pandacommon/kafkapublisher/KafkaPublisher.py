@@ -7,15 +7,16 @@ pandamon will consume those messages for realtime logging.
 import hashlib
 import json
 import socket
+from typing import Any
 
-from confluent_kafka import Producer
+from confluent_kafka import KafkaError, Message, Producer
 
 from pandacommon.commonconfig import common_config
 from pandacommon.pandalogger import logger_utils
 
 
 class KafkaPublisher:
-    def __init__(self):
+    def __init__(self) -> None:
         kafka_config = common_config.get("kafka")
         self.producer = Producer(
             {
@@ -30,10 +31,12 @@ class KafkaPublisher:
         self.topic = kafka_config["topic"]
         self.logger = logger_utils.setup_logger()
 
-    def get_bootstrap_servers(self, cluster, domain):
+    def get_bootstrap_servers(self, cluster: str, domain: str) -> str:
         return ",".join(map(lambda x: x + ":9093", sorted([(socket.gethostbyaddr(i))[0] for i in (socket.gethostbyname_ex(cluster + domain))[2]])))
 
-    def publish_message(self, payload, topic=None):
+    # the payload is a task/job state transition, whose values are whatever the caller put
+    # in it; this method adds a message_id to it before sending, so it has to be mutable
+    def publish_message(self, payload: dict[str, Any], topic: str | None = None) -> None:
         # Convert payload to JSON string
         message = json.dumps(payload)
 
@@ -54,7 +57,7 @@ class KafkaPublisher:
         # Wait for the message to be sent
         self.producer.flush()
 
-    def _delivery_report(self, err, msg):
+    def _delivery_report(self, err: KafkaError | None, msg: Message) -> None:
         if err is not None:
             self.logger.error(f"Failed to deliver message: {err}")
             # print(f'Failed to deliver message: {err}')
@@ -62,5 +65,5 @@ class KafkaPublisher:
             self.logger.info(f"Message delivered to {msg.topic()} [{msg.partition()}]")
             # print(f'Message delivered to {msg.topic()} [{msg.partition()}]')
 
-    def close(self):
+    def close(self) -> None:
         self.producer.flush()

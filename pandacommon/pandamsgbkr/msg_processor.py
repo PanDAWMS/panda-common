@@ -4,7 +4,7 @@ import os
 import re
 import time
 import traceback
-from typing import Any, Literal, overload
+from typing import Any, Literal, TypedDict, overload
 
 from pandacommon.pandalogger import logger_utils
 from pandacommon.pandautils.PandaUtils import try_malloc_trim
@@ -15,6 +15,17 @@ from .msg_bkr_utils import MBListenerProxy, MBSenderProxy, MsgBuffer
 
 # logger
 base_logger = logger_utils.setup_logger("msg_processor")
+
+
+# What start_passive_mode returns: the proxies it spawned, keyed by queue name. Written in
+# the functional form because "in" is a keyword and cannot be a field in the class form.
+PassiveProxies = TypedDict(
+    "PassiveProxies",
+    {
+        "in": dict[str, MBListenerProxy],
+        "out": dict[str, MBSenderProxy],
+    },
+)
 
 
 # get mb proxy instance
@@ -112,12 +123,12 @@ class SimpleMsgProcPluginBase:
         """
         self.params = params
 
-    def initialize(self):
+    def initialize(self) -> None:
         """
         Initialize plugin instance, run once before loop in thread.
         """
 
-    def terminate(self):
+    def terminate(self) -> None:
         """
         Terminate plugin instance, run before stopping the thread.
         """
@@ -185,7 +196,7 @@ class SimpleMsgProcThread(GenericThread):
         self.thread_j = thread_j
         self.verbose = attr_dict.get("verbose", False)
 
-    def run(self):
+    def run(self) -> None:
         """
         Main thread execution loop for simple message processing.
         """
@@ -256,7 +267,7 @@ class SimpleMsgProcThread(GenericThread):
         self.plugin.terminate()
         self.logger.info("stopped run")
 
-    def stop(self):
+    def stop(self) -> None:
         """
         Send stop signal to this thread; will stop after current loop done
         """
@@ -292,7 +303,7 @@ class MultiMsgProcThread(GenericThread):
         self.thread_j = thread_j
         self.verbose = attr_dict.get("verbose", False)
 
-    def run(self):
+    def run(self) -> None:
         """
         Main thread execution loop for multi-message processing.
         """
@@ -368,7 +379,7 @@ class MultiMsgProcThread(GenericThread):
         self.plugin.terminate()
         self.logger.info("stopped run")
 
-    def stop(self):
+    def stop(self) -> None:
         """
         Send stop signal to this thread; will stop after current loop done
         """
@@ -416,7 +427,7 @@ class MsgProcAgentBase(GenericThread):
         # done
         tmp_logger.info("done")
 
-    def _parse_config(self):
+    def _parse_config(self) -> None:
         """
         Parse message processor configuration JSON file.
 
@@ -490,7 +501,7 @@ class MsgProcAgentBase(GenericThread):
             self.guard_period = raw_dict["guard_period"]
         tmp_logger.debug("done")
 
-    def _setup_instances(self):
+    def _setup_instances(self) -> None:
         """
         Set up attributes and MBListenerProxy/plugin instances accordingly.
         """
@@ -577,7 +588,7 @@ class MsgProcAgentBase(GenericThread):
         del in_q_set, out_q_set, mb_listener_proxy_dict, mb_sender_proxy_dict, processor_attr_map
         tmp_logger.debug("done")
 
-    def _spawn_listeners(self, mb_listener_proxy_list: list):
+    def _spawn_listeners(self, mb_listener_proxy_list: list[MBListenerProxy]) -> None:
         """
         spawn connection/listener threads of certain message broker listener proxy
 
@@ -591,7 +602,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"spawned listener {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _guard_listeners(self, mb_listener_proxy_list: list):
+    def _guard_listeners(self, mb_listener_proxy_list: list[MBListenerProxy]) -> None:
         """
         guard connection/listener threads of certain message broker listener proxy, reconnect when disconnected
 
@@ -609,7 +620,7 @@ class MsgProcAgentBase(GenericThread):
                 tmp_logger.info(f"restarted listener {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _kill_listeners(self, mb_listener_proxy_list: list):
+    def _kill_listeners(self, mb_listener_proxy_list: list[MBListenerProxy]) -> None:
         """
         kill connection/listener threads of certain message broker listener proxy
 
@@ -623,7 +634,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"stopped listener {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _spawn_senders(self, mb_sender_proxy_list: list):
+    def _spawn_senders(self, mb_sender_proxy_list: list[MBSenderProxy]) -> None:
         """
         spawn connection/sender threads of certain message broker sender proxy
 
@@ -637,7 +648,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"spawned sender {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _guard_senders(self, mb_sender_proxy_list: list):
+    def _guard_senders(self, mb_sender_proxy_list: list[MBSenderProxy]) -> None:
         """
         guard connection/sender threads of certain message broker sender proxy, reconnect when disconnected
 
@@ -655,7 +666,7 @@ class MsgProcAgentBase(GenericThread):
                 tmp_logger.info(f"restarted sender {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _kill_senders(self, mb_sender_proxy_list: list):
+    def _kill_senders(self, mb_sender_proxy_list: list[MBSenderProxy]) -> None:
         """
         kill connection/sender threads of certain message broker sender proxy
 
@@ -669,7 +680,7 @@ class MsgProcAgentBase(GenericThread):
             tmp_logger.info(f"stopped sender {mb_proxy.name}")
         tmp_logger.debug("done")
 
-    def _spawn_processors(self, processor_list: list):
+    def _spawn_processors(self, processor_list: list[tuple[str, int]]) -> None:
         """
         spawn processors threads
 
@@ -698,7 +709,7 @@ class MsgProcAgentBase(GenericThread):
                 )
         tmp_logger.debug("done")
 
-    def _kill_processors(self, processor_list: list, block: bool = True):
+    def _kill_processors(self, processor_list: list[tuple[str, int]], block: bool = True) -> None:
         """
         kill processor threads
 
@@ -727,7 +738,7 @@ class MsgProcAgentBase(GenericThread):
                 tmp_logger.error(f"failed to stop processor thread {processor_id} ; {e.__class__.__name__}: {e} ")
         tmp_logger.debug("done")
 
-    def initialize(self):
+    def initialize(self) -> None:
         """
         customized initialize method
         this method can override attributes set from config file
@@ -737,7 +748,7 @@ class MsgProcAgentBase(GenericThread):
 
         tmp_logger.debug("done")
 
-    def stop(self, block: bool = True):
+    def stop(self, block: bool = True) -> None:
         """
         send stop signal to this thread
 
@@ -753,7 +764,7 @@ class MsgProcAgentBase(GenericThread):
                 time.sleep(0.01)
         tmp_logger.debug("done")
 
-    def run(self):
+    def run(self) -> None:
         """
         Main thread
         """
@@ -791,7 +802,7 @@ class MsgProcAgentBase(GenericThread):
         self._kill_processors(self.init_processor_list)
         tmp_logger.debug("done")
 
-    def start_passive_mode(self, in_q_list: list[str] | None = None, out_q_list: list[str] | None = None) -> dict:
+    def start_passive_mode(self, in_q_list: list[str] | None = None, out_q_list: list[str] | None = None) -> PassiveProxies:
         """
         start passive mode: only spawn mb proxies (without spawning agent and plugin threads)
 
@@ -848,7 +859,7 @@ class MsgProcAgentBase(GenericThread):
             "out": self.passive_mb_sender_proxy_dict,
         }
 
-    def stop_passive_mode(self):
+    def stop_passive_mode(self) -> None:
         """
         stop mb proxies which were spawned in passive mode
         """
