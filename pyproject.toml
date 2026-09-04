@@ -53,13 +53,28 @@ exclude = [
     ".idea"
 ]
 
-[tool.black]
-line-length=160
+[tool.ruff]
+line-length = 160
+
+[tool.ruff.lint]
+# F: pyflakes. The gate started as F821 alone, because an undefined name parses fine and
+# raises at import time instead -- easy to hit with annotations, since the class named in
+# one has to be imported even though nothing calls it. The rest of F costs nothing here
+# and catches the same class of defect: F822 for a name missing from __all__, F811 for a
+# definition silently shadowing an earlier one.
+#
+# I: import order, in place of isort. ruff's defaults already agree with ruff-format, so
+# there is no profile to set.
+#
+# Syntax errors are reported whatever is selected, which is why there is no E9 here and
+# no separate py_compile step in CI.
+select = ["F", "I"]
 
 # The tree is clean under these flags and CI fails on any finding, so a change that
-# introduces one has to fix it. These match panda-server's [tool.mypy]; keep them and
-# the pins in .github/workflows/syntax-check.yml aligned with that repository, because
-# it type checks against the annotations here.
+# introduces one has to fix it. These match panda-server's [tool.mypy]. Keeping them and
+# the pins in .pre-commit-config.yaml aligned with that repository is a convenience, not
+# a requirement: its CI does not install this package, so the annotations here are Any to
+# it. What alignment buys is that an upgrade is worked out once rather than twice.
 [tool.mypy]
 files = ["pandacommon"]
 ignore_missing_imports = true
@@ -85,6 +100,3 @@ disable = [
     "R0913",
     "R0914", #  R0914: Too many local variables
 ]
-
-[tool.isort]
-profile = "black"

@@ -1,36 +1,22 @@
 repos:
 
--   repo: https://github.com/psf/black
-    rev: 24.10.0
-    hooks:
-    -   id: black
-        types: [python]
-
--   repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-    -   id: isort
-        name: isort (python)
-
-# A name that does not exist parses fine and raises at import time instead. Type
-# annotations make this easy to hit, because the class named in one has to be imported
-# even though nothing calls it.
+# ruff stands in for black and isort as well as being the linter: one pin instead of
+# three, and one tool to reason about. Its formatter targets black's style but is not
+# byte-identical to it, which is why the switch came with a one-time reformat of the
+# tree. panda-server is still on black; bringing it over is a follow-up.
 #
-# The whole tree, not just the staged files: the scan takes hundredths of a second, and
-# a name can be broken by an edit somewhere else -- a renamed import, a deleted helper,
-# a moved class.
-#
-# --isolated means this run ignores [tool.ruff] in pyproject.toml entirely: an exclude
-# or a target-version added there would have no effect here. That is inherited from the
-# CI step this replaced, and is worth revisiting if the rule selection ever moves into
-# pyproject.
+# The rules and the line length live in [tool.ruff] in pyproject.toml, so --isolated is
+# deliberately absent here.
 -   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.5
+    rev: v0.16.6
     hooks:
+    # The whole tree, not just the staged files: the scan takes hundredths of a second,
+    # and a name can be broken by an edit somewhere else -- a renamed import, a deleted
+    # helper, a moved class.
     -   id: ruff-check
-        name: ruff (undefined names)
-        args: [--isolated, --select, F821, .]
+        args: [--fix, .]
         pass_filenames: false
+    -   id: ruff-format
 
 # This package declares py.typed, so its annotations are what panda-server and every
 # other consumer type check against.
