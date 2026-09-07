@@ -84,8 +84,10 @@ def mm_notification():
     }
     headers = {"Content-Type": "application/json"}
     try:
-        response = requests.post(mm_webhook_url, data=json.dumps(mm_message), headers=headers)
-    except requests.exceptions.RequestException as e:
+        # a notification that does not arrive must not fail the build, so the response is
+        # not inspected and the exception is swallowed
+        requests.post(mm_webhook_url, data=json.dumps(mm_message), headers=headers)
+    except requests.exceptions.RequestException:
         pass
 
 

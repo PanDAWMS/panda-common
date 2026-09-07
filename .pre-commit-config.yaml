@@ -1,13 +1,46 @@
 repos:
 
--   repo: https://github.com/psf/black
-    rev: 23.9.1
+# ruff stands in for black and isort as well as being the linter: one pin instead of
+# three, and one tool to reason about. Its formatter targets black's style but is not
+# byte-identical to it, which is why the switch came with a one-time reformat of the
+# tree. panda-server is still on black; bringing it over is a follow-up.
+#
+# The rules and the line length live in [tool.ruff] in pyproject.toml, so --isolated is
+# deliberately absent here.
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.6
     hooks:
-    -   id: black
-        types: [python]
+    # The whole tree, not just the staged files: the scan takes hundredths of a second,
+    # and a name can be broken by an edit somewhere else -- a renamed import, a deleted
+    # helper, a moved class.
+    -   id: ruff-check
+        args: [--fix, .]
+        pass_filenames: false
+    -   id: ruff-format
 
--   repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+# This package declares py.typed, so its annotations are what panda-server and every
+# other consumer type check against.
+#
+# The tree is clean under these flags, so the gate is mypy itself: any finding fails.
+# Do not swap it for a count -- annotating a function turns on checking of its whole
+# body, so improving annotations can raise the number before it lowers it. With zero as
+# the bar that goes away.
+#
+# pass_filenames is off so this runs `mypy` with no arguments: the file list comes from
+# [tool.mypy] in pyproject.toml. Handing it the staged files instead would both miss
+# files that an edit elsewhere breaks and change which flags apply. args is emptied for
+# the same reason -- this mirror defaults to passing --ignore-missing-imports and
+# --scripts-are-modules, and the settings belong in pyproject.
+#
+# mypy and the stubs are pinned together: the stubs are part of what the run sees, so
+# an unpinned upgrade would produce findings without a code change. When upgrading
+# either, fix what the new version reports in the same PR.
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
     hooks:
-    -   id: isort
-        name: isort (python)
+    -   id: mypy
+        args: []
+        additional_dependencies:
+        -   types-requests==2.33.0.20260712
+        -   types-pytz==2026.3.1.20260727
+        pass_filenames: false

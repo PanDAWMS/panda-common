@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import time
+from typing import TypedDict
 
 from pandacommon.pandalogger.PandaLogger import PandaLogger
 from pandacommon.pandamsgbkr import msg_bkr_utils, msg_processor
@@ -55,7 +56,22 @@ CONFIG_JSON = """
 }
 """
 
-EXTRA_PROXY_INFO = {
+
+class _ProxyInfo(TypedDict):
+    """The proxy arguments one test queue is built with.
+
+    Stated as a TypedDict because these are splatted into MBSenderProxy and
+    MBListenerProxy: as a plain dict literal the values widen to object, and nothing
+    then matches the parameters they are passed to.
+    """
+
+    host_port_list: list[str]
+    destination: str
+    use_ssl: bool
+    vhost: str | None
+
+
+EXTRA_PROXY_INFO: dict[str, _ProxyInfo] = {
     "Q1": {
         "host_port_list": ["127.0.0.1:61613"],
         "destination": "/queue/test_1",
@@ -97,32 +113,34 @@ answer_set_b = {"B{0}".format(i) for i in range(20)}
 
 
 class TestMsg_processorPlugin_1(msg_processor.SimpleMsgProcPluginBase):
-    def initialize(self):
+    def initialize(self) -> None:
         logger.debug("TestMsg_processorPlugin_1.initialize called")
 
-    def process(self, msg_obj):
+    # the base declares msg_obj as Any because a plugin with no input queue is handed
+    # None; these tests always run with one, so they state what they actually get
+    def process(self, msg_obj: msg_bkr_utils.MsgObj) -> str:
         logger.debug("TestMsg_processorPlugin_1.process called")
         logger.info("got message obj: sub_id={s}, msg_id={m}, data={d}".format(s=msg_obj.sub_id, m=msg_obj.msg_id, d=msg_obj.data))
         return msg_obj.data
 
 
 class TestMsgProcessorPlugin2(msg_processor.SimpleMsgProcPluginBase):
-    def initialize(self):
+    def initialize(self) -> None:
         logger.debug("TestMsgProcessorPlugin2.initialize called")
 
-    def process(self, msg_obj):
+    def process(self, msg_obj: msg_bkr_utils.MsgObj) -> str:
         logger.debug("TestMsgProcessorPlugin2.process called")
         logger.info("got message obj: sub_id={s}, msg_id={m}, data={d}".format(s=msg_obj.sub_id, m=msg_obj.msg_id, d=msg_obj.data))
         return msg_obj.data
 
 
 class TestMsgProcessorAgent(msg_processor.MsgProcAgentBase):
-    def initialize(self):
+    def initialize(self) -> None:
         logger.debug("TestMsgProcessorAgent.initialize called")
         pass
 
 
-def main():
+def main() -> None:
     # start
     sys.stderr.write("Start test \n")
     sys.stderr.flush()

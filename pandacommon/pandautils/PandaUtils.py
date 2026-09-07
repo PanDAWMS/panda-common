@@ -2,16 +2,26 @@ import ctypes
 import datetime
 import itertools
 import os
+from collections.abc import Iterable, Iterator
 from ctypes.util import find_library
 from functools import lru_cache
+from typing import Any, Protocol, TypeVar
 
 import pytz
 
 from . import utils_config
 
+_T = TypeVar("_T")
+
+
+class _DebugLogger(Protocol):
+    """What try_malloc_trim needs of a logger: both logging.Logger and LogWrapper match."""
+
+    def debug(self, msg: str) -> Any: ...
+
 
 # check if logrotating
-def isLogRotating(before_limit, after_limit):
+def isLogRotating(before_limit: float, after_limit: float) -> bool:
     # time zone
     if hasattr(utils_config, "rotate_tz"):
         tmp_tz = utils_config.rotate_tz
@@ -84,7 +94,7 @@ def naive_utcfromtimestamp(timestamp: float) -> datetime.datetime:
     return aware_utcfromtimestamp(timestamp).replace(tzinfo=None)
 
 
-def batched(iterable, n, *, strict=False):
+def batched(iterable: Iterable[_T], n: int, *, strict: bool = False) -> Iterator[tuple[_T, ...]]:
     """
     Batch data from the iterable into tuples of length n. The last batch may be shorter than n
     If strict is true, will raise a ValueError if the final batch is shorter than n
@@ -99,7 +109,7 @@ def batched(iterable, n, *, strict=False):
         yield batch
 
 
-def get_sql_IN_bind_variables(values, prefix: str, value_as_suffix=False) -> tuple[str, dict]:
+def get_sql_IN_bind_variables(values: Iterable[Any], prefix: str, value_as_suffix: bool = False) -> tuple[str, dict[str, Any]]:
     """
     Get the comma-separated string expression with bind variables to be used with SQL IN-condition and the corresponding variable map
     E.g. get_sql_IN_bind_variables(["done", "finished", "aborted"], prefix=":status_") will return the tuple:
@@ -115,7 +125,7 @@ def get_sql_IN_bind_variables(values, prefix: str, value_as_suffix=False) -> tup
         dict: map of variable names and values, to be put as variable map of SQL execute
     """
     var_name_list = []
-    ret_var_map = {}
+    ret_var_map: dict[str, Any] = {}
     for j, value in enumerate(values):
         if value_as_suffix:
             var_name = f"{prefix}{str(value)}"
@@ -128,7 +138,7 @@ def get_sql_IN_bind_variables(values, prefix: str, value_as_suffix=False) -> tup
 
 
 @lru_cache(maxsize=1)
-def _get_malloc_trim():
+def _get_malloc_trim() -> "ctypes._NamedFuncPointer | None":
     if os.name != "posix":
         return None
     libc_path = find_library("c")
@@ -149,7 +159,7 @@ def _get_malloc_trim():
     return malloc_trim
 
 
-def try_malloc_trim(logger=None) -> bool:
+def try_malloc_trim(logger: _DebugLogger | None = None) -> bool:
     """
     Best-effort release of free heap pages to the OS on supported platforms.
 

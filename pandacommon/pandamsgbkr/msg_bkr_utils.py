@@ -11,6 +11,7 @@ import threading
 import time
 import traceback
 import uuid
+from typing import Any, TypedDict, cast
 
 import stomp
 
@@ -35,8 +36,9 @@ stomp_logger.propagate = False
 # global lock
 _GLOBAL_LOCK = threading.Lock()
 
-# global map of message buffers
-_BUFFER_MAP = {}
+# global map of message buffers, keyed by queue name. MsgBuffer is defined further down,
+# so the reference has to stay quoted: this annotation is evaluated at import time
+_BUFFER_MAP: dict[str, "MsgBuffer"] = {}
 
 
 # get connection dict
@@ -71,11 +73,14 @@ def _get_connection_dict(
     # resolve all distinct hosts behind hostname
     resolved_host_port_set = set()
     for host_port in host_port_list:
-        host, port = host_port.split(":")
-        port = int(port)
+        host, port_str = host_port.split(":")
+        port = int(port_str)
         addrinfos = socket.getaddrinfo(host, port)
         for addrinfo in addrinfos:
-            resolved_host = socket.getfqdn(addrinfo[4][0])
+            # the sockaddr is annotated as a union that includes tuple[int, bytes], for
+            # the link-layer families, so its first element is str | int. Resolving a
+            # host and port yields neither of those families
+            resolved_host = socket.getfqdn(cast(str, addrinfo[4][0]))
             resolved_host_port_set.add((resolved_host, port))
     # make connections
     for host, port in resolved_host_port_set:
@@ -126,8 +131,12 @@ class MsgBuffer:
     Global message buffer. Singleton for each queue name
     """
 
+    # installed by _initialize, which __new__ runs once per queue name
+    queue_name: str
+    __fifo: "collections.deque[MsgObj]"
+
     @staticmethod
-    def _initialize(self: "MsgBuffer", queue_name: str):
+    def _initialize(self: "MsgBuffer", queue_name: str) -> None:
         """
         Initialize MsgBuffer singleton instance.
 
@@ -158,7 +167,7 @@ class MsgBuffer:
                 cls._initialize(inst, queue_name)
             return _BUFFER_MAP[key]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Do NOT write anything here because of singleton
         pass
 
@@ -184,7 +193,7 @@ class MsgBuffer:
             ret = None
         return ret
 
-    def put(self, obj: "MsgObj"):
+    def put(self, obj: "MsgObj") -> None:
         """
         Put message into buffer (FIFO).
 
@@ -203,7 +212,7 @@ class MsgObj(object):
 
     __slots__ = ("__mb_proxy", "conn_id", "sub_id", "msg_id", "ack_id", "data", "is_transacted", "txs_id")
 
-    def __init__(self, mb_proxy: "MBProxyBase", conn_id: str, msg_id: str, ack_id: str | None, data: str, is_transacted: bool = True):
+    def __init__(self, mb_proxy: "MBListenerProxy", conn_id: str, msg_id: str, ack_id: str | None, data: str, is_transacted: bool = True):
         """
         Initialize MsgObj instance.
 
@@ -243,7 +252,7 @@ class MsgObj(object):
             self.txs_id = self.__mb_proxy._begin(self.conn_id)
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: object):
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: object) -> None:
         """
         Exit context manager.
 
@@ -276,7 +285,7 @@ class MsgListener(stomp.ConnectionListener):
     Message listener of STOMP
     """
 
-    def __init__(self, mb_proxy: "MBProxyBase", conn_id: str, *args, **kwargs):
+    def __init__(self, mb_proxy: "MBProxyBase", conn_id: str, *args: Any, **kwargs: Any) -> None:
         """
         Initialize MsgListener instance.
 
@@ -296,7 +305,9 @@ class MsgListener(stomp.ConnectionListener):
         # whether log verbosely
         self.verbose = kwargs.get("verbose", False)
 
-    def _parse_args(self, args: tuple) -> tuple[str | None, dict, str]:
+    # stomp.py hands the callback either one frame or a headers/message pair, which is
+    # why args is not spelled out. The headers a broker sends are all strings
+    def _parse_args(self, args: tuple[Any, ...]) -> tuple[str | None, dict[str, str], str]:
         """
         Parse arguments for different versions of stomp.py.
 
@@ -316,7 +327,9 @@ class MsgListener(stomp.ConnectionListener):
             headers, message = args
             return None, headers, message
 
-    def on_error(self, *args):
+        raise ValueError(f"cannot parse {len(args)} arguments from the stomp callback")
+
+    def on_error(self, *args: Any) -> None:
         """
         Handle error message from message broker.
 
@@ -329,7 +342,7 @@ class MsgListener(stomp.ConnectionListener):
         self.mb_proxy._on_error(headers)
         self.logger.debug("on_error done")
 
-    def on_connected(self, *args):
+    def on_connected(self, *args: Any) -> None:
         """
         Handle connection established message from message broker.
 
@@ -342,7 +355,7 @@ class MsgListener(stomp.ConnectionListener):
         self.mb_proxy._on_connected(headers=headers)
         self.logger.debug("on_connected done")
 
-    def on_disconnected(self):
+    def on_disconnected(self) -> None:
         """
         Handle disconnection message from message broker.
         """
@@ -350,7 +363,7 @@ class MsgListener(stomp.ConnectionListener):
         self.mb_proxy._on_disconnected(conn_id=self.conn_id)
         self.logger.debug("on_disconnected done")
 
-    def on_send(self, *args):
+    def on_send(self, *args: Any) -> None:
         """
         Handle send frame message from message broker.
 
@@ -365,7 +378,7 @@ class MsgListener(stomp.ConnectionListener):
         if self.verbose:
             self.logger.debug(f"on_send frame: {cmd} {obscured_headers} | {body}")
 
-    def on_message(self, *args):
+    def on_message(self, *args: Any) -> None:
         """
         Handle incoming message from message broker.
 
@@ -385,6 +398,15 @@ class MBProxyBase:
     """
     Base MBProxy class
     """
+
+    # Defined by every subclass and called from here: MsgListener.on_message reaches
+    # _on_message through this class, and _on_error restarts through restart()
+
+    def _on_message(self, headers: dict[str, str], body: str, conn_id: str) -> None:
+        raise NotImplementedError
+
+    def restart(self) -> None:
+        raise NotImplementedError
 
     def __init__(
         self,
@@ -478,7 +500,9 @@ class MBProxyBase:
         Returns:
             True if connected to RabbitMQ, False otherwise.
         """
-        return getattr(self, "mq_server", None) and self.mq_server.startswith("RabbitMQ/")
+        # mq_server is only set once a CONNECTED frame names the server
+        mq_server: str | None = getattr(self, "mq_server", None)
+        return mq_server is not None and mq_server.startswith("RabbitMQ/")
 
     @property
     def got_connected(self) -> bool:
@@ -491,7 +515,7 @@ class MBProxyBase:
         return self._got_connected_event.is_set()
 
     @got_connected.setter
-    def got_connected(self, value: bool):
+    def got_connected(self, value: bool) -> None:
         """
         Set connection status.
 
@@ -514,7 +538,7 @@ class MBProxyBase:
         return self._got_disconnected_event.is_set()
 
     @got_disconnected.setter
-    def got_disconnected(self, value: bool):
+    def got_disconnected(self, value: bool) -> None:
         """
         Set disconnection status.
 
@@ -526,7 +550,7 @@ class MBProxyBase:
         else:
             self._got_disconnected_event.clear()
 
-    def _on_connected(self, headers: dict):
+    def _on_connected(self, headers: dict[str, str]) -> None:
         """
         Internal handler for connection established event.
 
@@ -545,7 +569,7 @@ class MBProxyBase:
         # done
         self.got_connected = True
 
-    def _on_disconnected(self, conn_id: str):
+    def _on_disconnected(self, conn_id: str) -> None:
         """
         Internal handler for disconnection event.
 
@@ -555,7 +579,7 @@ class MBProxyBase:
         self.logger.debug(f"_on_disconnected from {conn_id} called")
         self.got_disconnected = True
 
-    def _on_error(self, headers: dict):
+    def _on_error(self, headers: dict[str, str]) -> None:
         """
         Internal handler for error event.
 
@@ -570,36 +594,36 @@ class MBProxyBase:
                 self._to_freeze_dest = True
             self.logger.debug(f"_on_error : got not_found from RabbitMQ; modified new destination into {self.new_destination} ; restarting")
             self.restart()
-            self.logger.debug(f"_on_error : restarted")
+            self.logger.debug("_on_error : restarted")
 
 
 # message broker proxy for receiver
 class MBListenerProxy(MBProxyBase):
     def __init__(
         self,
-        name,
-        host_port_list,
-        destination,
-        use_ssl=False,
-        cert_file=None,
-        key_file=None,
-        vhost=None,
-        username=None,
-        passcode=None,
-        wait=True,
-        ack_mode="client-individual",
-        skip_buffer=False,
-        conn_mode="all",
-        prefetch_size=None,
-        max_buffer_len=999,
-        buffer_block_sec=10,
-        use_transaction=True,
-        verbose=False,
-        keepalive=True,
-        send_heartbeat_ms=60000,
-        recv_heartbeat_ms=0,
-        **kwargs,
-    ):
+        name: str,
+        host_port_list: list[str],
+        destination: str,
+        use_ssl: bool = False,
+        cert_file: str | None = None,
+        key_file: str | None = None,
+        vhost: str | None = None,
+        username: str | None = None,
+        passcode: str | None = None,
+        wait: bool = True,
+        ack_mode: str = "client-individual",
+        skip_buffer: bool = False,
+        conn_mode: str = "all",
+        prefetch_size: int | None = None,
+        max_buffer_len: int = 999,
+        buffer_block_sec: int = 10,
+        use_transaction: bool = True,
+        verbose: bool = False,
+        keepalive: bool = True,
+        send_heartbeat_ms: int = 60000,
+        recv_heartbeat_ms: int = 0,
+        **kwargs: Any,
+    ) -> None:
         # initialize base class
         super().__init__(
             name=name,
@@ -630,14 +654,14 @@ class MBListenerProxy(MBProxyBase):
         self.use_transaction = use_transaction
         # connection mode; "all" or "any"
         self.conn_mode = conn_mode
-        # connection dict
-        self.connection_dict = {}
-        # message listener dict
-        self.listener_dict = {}
+        # connection dict, keyed by connection id
+        self.connection_dict: dict[str, stomp.Connection12] = {}
+        # message listener dict, keyed by connection id
+        self.listener_dict: dict[str, MsgListener] = {}
         # whether to skip buffer and dump to self.dump_msgs; True only in testing
         self.skip_buffer = skip_buffer
-        # dump messages
-        self.dump_msgs = []
+        # dump messages: the body of each message, not the MsgObj wrapping it
+        self.dump_msgs: list[str] = []
         # prefetch count of the MB (max number of un-acknowledge messages allowed)
         self.prefetch_size = prefetch_size
         # evaluate subscription headers
@@ -645,7 +669,7 @@ class MBListenerProxy(MBProxyBase):
         # get connections
         self._get_connections()
 
-    def _get_connections(self):
+    def _get_connections(self) -> None:
         """
         Get connections and generate listener objects.
         """
@@ -674,7 +698,7 @@ class MBListenerProxy(MBProxyBase):
             self.logger.debug(f"got connection about {conn_id}")
         self.logger.debug("done")
 
-    def _evaluate_subscription_headers(self):
+    def _evaluate_subscription_headers(self) -> None:
         """
         Evaluate and set subscription headers based on configuration.
         """
@@ -698,12 +722,14 @@ class MBListenerProxy(MBProxyBase):
             Transaction ID.
         """
         conn = self.connection_dict[conn_id]
-        txs_id = conn.begin()
+        # stomp.py is untyped, so begin() is Any; the annotation is what settles the
+        # transaction id as a string here rather than leaving it to the caller
+        txs_id: str = conn.begin()
         if self.verbose:
             self.logger.debug(f"{conn_id} txid={txs_id} BEGIN")
         return txs_id
 
-    def _commit(self, conn_id: str, txs_id: str):
+    def _commit(self, conn_id: str, txs_id: str) -> None:
         """
         Commit a transaction.
 
@@ -716,7 +742,7 @@ class MBListenerProxy(MBProxyBase):
         if self.verbose:
             self.logger.debug(f"{conn_id} txid={txs_id} COMMIT")
 
-    def _abort(self, conn_id: str, txs_id: str):
+    def _abort(self, conn_id: str, txs_id: str) -> None:
         """
         Abort a transaction.
 
@@ -728,7 +754,7 @@ class MBListenerProxy(MBProxyBase):
         conn.abort(txs_id)
         self.logger.warning(f"{conn_id} txid={txs_id} ABORT")
 
-    def _ack(self, conn_id: str, msg_id: str, ack_id: str):
+    def _ack(self, conn_id: str, msg_id: str, ack_id: str | None) -> None:
         """
         Acknowledge a message.
 
@@ -743,7 +769,7 @@ class MBListenerProxy(MBProxyBase):
             if self.verbose:
                 self.logger.debug(f"{conn_id} {msg_id} {ack_id} ACK")
 
-    def _nack(self, conn_id: str, msg_id: str, ack_id: str):
+    def _nack(self, conn_id: str, msg_id: str, ack_id: str | None) -> None:
         """
         Negatively acknowledge a message.
 
@@ -757,7 +783,7 @@ class MBListenerProxy(MBProxyBase):
             conn.nack(ack_id)
             self.logger.warning(f"{conn_id} {msg_id} {ack_id} NACK")
 
-    def _on_message(self, headers: dict, body: str, conn_id: str):
+    def _on_message(self, headers: dict[str, str], body: str, conn_id: str) -> None:
         """
         Internal handler for incoming message.
 
@@ -789,7 +815,7 @@ class MBListenerProxy(MBProxyBase):
                 n_buffered_msg = self.msg_buffer.size()
                 self.logger.debug(f"_on_message put into buffer ({n_buffered_msg}): {headers}")
 
-    def go(self):
+    def go(self) -> None:
         """
         Start listening to message queue.
         """
@@ -821,7 +847,7 @@ class MBListenerProxy(MBProxyBase):
                 self.got_disconnected = True
                 break
 
-    def stop(self):
+    def stop(self) -> None:
         """
         Stop listening to message queue.
         """
@@ -833,7 +859,7 @@ class MBListenerProxy(MBProxyBase):
         self.got_connected = False
         self.logger.info("done")
 
-    def restart(self):
+    def restart(self) -> None:
         """
         Restart connection to message queue.
         """
@@ -869,26 +895,37 @@ class MBListenerProxy(MBProxyBase):
         return msg_list
 
 
+class _Remover(TypedDict):
+    """One remover subscription: the selector it matches on, and when it expires.
+
+    purge_removers compares the timestamp, and go() resubscribes with the headers after
+    a reconnect, so both fields are read back rather than only written.
+    """
+
+    timeout: datetime.datetime
+    headers: dict[str, Any]
+
+
 # message broker proxy for sender, waster...
 class MBSenderProxy(MBProxyBase):
     def __init__(
         self,
-        name,
-        host_port_list,
-        destination,
-        use_ssl=False,
-        cert_file=None,
-        key_file=None,
-        vhost=None,
-        username=None,
-        passcode=None,
-        wait=True,
-        verbose=False,
-        keepalive=True,
-        send_heartbeat_ms=60000,
-        recv_heartbeat_ms=0,
-        **kwargs,
-    ):
+        name: str,
+        host_port_list: list[str],
+        destination: str,
+        use_ssl: bool = False,
+        cert_file: str | None = None,
+        key_file: str | None = None,
+        vhost: str | None = None,
+        username: str | None = None,
+        passcode: str | None = None,
+        wait: bool = True,
+        verbose: bool = False,
+        keepalive: bool = True,
+        send_heartbeat_ms: int = 60000,
+        recv_heartbeat_ms: int = 0,
+        **kwargs: Any,
+    ) -> None:
         # initialize base class
         super().__init__(
             name=name,
@@ -909,12 +946,12 @@ class MBSenderProxy(MBProxyBase):
         )
         # instance lock for removers
         self.remover_lock = threading.Lock()
-        # removers
-        self.removers = {}
+        # removers, keyed by the subscription id that add_remover generated
+        self.removers: dict[str, _Remover] = {}
         # get connection
         self._get_connection()
 
-    def _get_connection(self):
+    def _get_connection(self) -> None:
         """
         Get a connection and a listener.
         """
@@ -932,7 +969,7 @@ class MBSenderProxy(MBProxyBase):
         self.listener = MsgListener(mb_proxy=self, conn_id=self.conn_id, verbose=self.verbose)
         self.logger.debug(f"got connection about {self.conn_id}")
 
-    def _on_message(self, headers: dict, body: str, conn_id: str):
+    def _on_message(self, headers: dict[str, str], body: str, conn_id: str) -> None:
         """
         Internal handler for incoming message (drops messages in sender mode).
 
@@ -944,7 +981,9 @@ class MBSenderProxy(MBProxyBase):
         if self.verbose:
             self.logger.debug(f"_on_message from {conn_id} drop message: {headers} | {body}")
 
-    def send(self, data: str | None, headers: dict | None = None, **kwargs):
+    # headers are what the caller wants on the frame rather than what a broker sent, so
+    # the values are not restricted to strings the way the incoming ones are
+    def send(self, data: str | None, headers: dict[str, Any] | None = None, **kwargs: Any) -> None:
         """
         Send a message to queue.
 
@@ -969,7 +1008,7 @@ class MBSenderProxy(MBProxyBase):
                 if self.verbose:
                     self.logger.debug(f"send to {self.destination} | {data}")
 
-    def waste(self, duration: int = 3):
+    def waste(self, duration: int = 3) -> None:
         """
         Drop all messages received during a duration.
 
@@ -981,7 +1020,7 @@ class MBSenderProxy(MBProxyBase):
         self.conn.unsubscribe(id=self.sub_id)
         self.logger.debug(f"waste dropped messages for {duration} sec")
 
-    def go(self):
+    def go(self) -> None:
         """
         Start sending messages to queue.
         """
@@ -1014,7 +1053,7 @@ class MBSenderProxy(MBProxyBase):
             self.logger.error(f"failed to start connection to {self.conn_id} {self.destination} ; {e.__class__.__name__} \n{tb_str}")
             self.got_disconnected = True
 
-    def stop(self):
+    def stop(self) -> None:
         """
         Stop sending messages to queue.
         """
@@ -1024,7 +1063,7 @@ class MBSenderProxy(MBProxyBase):
         self.got_connected = False
         self.logger.info(f"disconnect from {self.conn_id} {self.destination}")
 
-    def restart(self):
+    def restart(self) -> None:
         """
         Restart connection to message queue.
         """
@@ -1036,7 +1075,7 @@ class MBSenderProxy(MBProxyBase):
         self.go()
         self.logger.info(f"the {self.n_restart}th restart done")
 
-    def add_remover(self, headers: dict, timeout: int):
+    def add_remover(self, headers: dict[str, Any], timeout: int) -> None:
         """
         Add a message remover to delete matching messages.
 
@@ -1059,7 +1098,7 @@ class MBSenderProxy(MBProxyBase):
         self.conn.subscribe(destination=self.destination, headers=headers, id=r_id, ack="auto")
         self.logger.debug(f"added remover id={r_id}")
 
-    def purge_removers(self):
+    def purge_removers(self) -> None:
         """
         Purge old message removers that have expired.
         """

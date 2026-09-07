@@ -1,21 +1,14 @@
+import http.client
 import json
 import logging
 import logging.handlers
 import os
 import threading
 import time
+from typing import Any, Literal, overload
+from urllib.parse import urlencode
 
 from . import logger_config
-
-try:
-    import http.client as httplib
-except ImportError:
-    import httplib
-try:
-    from urllib.parse import urlencode
-except ImportError:
-    from urllib import urlencode
-
 
 # encodings
 JSON = "json"
@@ -28,12 +21,20 @@ os.environ["TZ"] = "UTC"
 rotateLog = False
 
 # logger map
-loggerMap = {}
+loggerMap: dict[str, logging.Logger] = {}
 loggerMapLock = threading.Lock()
 
 
 # wrapper to avoid duplication of loggers with the same name
-def getLoggerWrapper(logger_name, checkNew=False):
+@overload
+def getLoggerWrapper(logger_name: str, checkNew: Literal[False] = False) -> logging.Logger: ...
+
+
+@overload
+def getLoggerWrapper(logger_name: str, checkNew: Literal[True]) -> tuple[logging.Logger, bool]: ...
+
+
+def getLoggerWrapper(logger_name: str, checkNew: bool = False) -> logging.Logger | tuple[logging.Logger, bool]:
     loggerMapLock.acquire()
     global loggerMap
     new_flag = False
@@ -50,7 +51,7 @@ def getLoggerWrapper(logger_name, checkNew=False):
 # a thread to send a record to a web server
 class _Emitter(threading.Thread):
     # constructor
-    def __init__(self, host, port, url, method, data, semaphore):
+    def __init__(self, host: str, port: int, url: str, method: str, data: Any, semaphore: threading.Semaphore) -> None:
         threading.Thread.__init__(self)
         self.host = host
         self.port = port
@@ -59,7 +60,7 @@ class _Emitter(threading.Thread):
         self.data = data
         self.semaphore = semaphore
 
-    def getData(self, src, chunk_size=1024):
+    def getData(self, src: Any, chunk_size: int = 1024) -> Any:
         """
         Use this function for debug purposes in order to print
         out the response from the server
@@ -70,10 +71,10 @@ class _Emitter(threading.Thread):
             data = src.read(chunk_size)
 
     # main
-    def run(self):
+    def run(self) -> None:
         # send the record to the Web server as an URL-encoded dictionary
         try:
-            connection = httplib.HTTPConnection(self.host, self.port, timeout=1)
+            connection = http.client.HTTPConnection(self.host, self.port, timeout=1)
             url = self.url
             if self.method == "GET":
                 if url.find("?") >= 0:
@@ -102,7 +103,7 @@ class _PandaHTTPLogHandler(logging.Handler):
     POST semantics.
     """
 
-    def __init__(self, host, url, port=80, urlprefix="", method="POST", encoding=URL):
+    def __init__(self, host: str, url: str, port: int = 80, urlprefix: str = "", method: str = "POST", encoding: str = URL) -> None:
         """
         Initialize the instance with the host, the request URL, and the method
         ("GET" or "POST")
@@ -126,9 +127,9 @@ class _PandaHTTPLogHandler(logging.Handler):
         else:
             self.my_semaphore = threading.Semaphore(10)
         # parameters
-        self.params = {"PandaID": -1, "User": "unknown", "Type": "unknown", "ID": "tester"}
+        self.params: dict[str, Any] = {"PandaID": -1, "User": "unknown", "Type": "unknown", "ID": "tester"}
 
-    def mapLogRecord(self, record):
+    def mapLogRecord(self, record: logging.LogRecord) -> dict[str, Any]:
         """
         Default implementation of mapping the log record into a dict
         that is sent as the CGI data. Overwrite in your class.
@@ -149,7 +150,7 @@ class _PandaHTTPLogHandler(logging.Handler):
             pass
         return newrec
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         """
         Emit a record.
 
@@ -178,16 +179,16 @@ class _PandaHTTPLogHandler(logging.Handler):
             # We lose the message
             pass
 
-    def setParams(self, params):
+    def setParams(self, params: dict[str, Any]) -> None:
         for pname in params.keys():
             self.params[pname] = params[pname]
 
     # acquire lock
-    def lockHandler(self):
+    def lockHandler(self) -> None:
         self.mylock.acquire()
 
     # release lock
-    def releaseHandler(self):
+    def releaseHandler(self) -> None:
         try:
             self.mylock.release()
         except Exception:
@@ -213,7 +214,8 @@ if len(_weblog.handlers) < 2:
     _allwebh = _PandaHTTPLogHandler(
         logger_config.daemon["loghost"],
         "http://%s" % logger_config.daemon["loghost"],
-        logger_config.daemon["monport-apache"],
+        # the config gives every value as text, and http.client wants a number
+        int(logger_config.daemon["monport-apache"]),
         logger_config.daemon["monurlprefix"],
         logger_config.daemon["method"],
         logger_config.daemon["encoding"],
@@ -225,7 +227,7 @@ if len(_weblog.handlers) < 2:
         _newwebh = _PandaHTTPLogHandler(
             logger_config.daemon["loghost_new"],
             "http://%s" % logger_config.daemon["loghost_new"],
-            logger_config.daemon["monport-apache_new"],
+            int(logger_config.daemon["monport-apache_new"]),
             logger_config.daemon["monurlprefix"],
             logger_config.daemon["method_new"],
             logger_config.daemon["encoding_new"],
@@ -263,10 +265,12 @@ class PandaLogger:
     type     Message type
     """
 
-    def __init__(self, pid=0, user="", id="", type=""):
-        self.params = {"PandaID": pid, "ID": id, "User": user, "Type": type}
+    def __init__(self, pid: int = 0, user: str = "", id: str = "", type: str = "") -> None:
+        self.params: dict[str, Any] = {"PandaID": pid, "ID": id, "User": user, "Type": type}
 
-    def getLogger(self, log_name, log_level=None):
+    def getLogger(self, log_name: str, log_level: str | None = None) -> logging.Logger:
+        # every branch below makes a FileHandler of some kind
+        txt_handler: logging.FileHandler
         log_h, new_log_flag = getLoggerWrapper("panda.log.%s" % log_name, True)
         log_h.propagate = False
         tmp_attr = "rotating_policy"
@@ -313,45 +317,45 @@ class PandaLogger:
                 txt_handler.doRollover()
         else:
             txt_handler = logging.FileHandler("%s/panda-%s.log" % (logger_config.daemon["logdir"], log_name), encoding="utf-8")
-        if log_level in ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]:
-            log_level = getattr(logging, log_level)
+        if log_level is not None and log_level in ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]:
+            level = getattr(logging, log_level)
             if new_log_flag:
-                log_h.setLevel(log_level)
+                log_h.setLevel(level)
         else:
-            log_level = logging.DEBUG
-        txt_handler.setLevel(log_level)
+            level = logging.DEBUG
+        txt_handler.setLevel(level)
         txt_handler.setFormatter(_formatter)
         log_h.addHandler(txt_handler)
         return log_h
 
-    def getHttpLogger(self, log_name):
+    def getHttpLogger(self, log_name: str) -> logging.Logger:
         httph = getLoggerWrapper("panda.mon.%s" % log_name)
         return httph
 
-    def setParams(self, params):
+    def setParams(self, params: dict[str, Any]) -> None:
         for pname in params.keys():
             self.params[pname] = params[pname]
         _allwebh.setParams(self.params)
         if "loghost_new" in logger_config.daemon:
             _newwebh.setParams(self.params)
 
-    def getParam(self, pname):
+    def getParam(self, pname: str) -> Any:
         return self.params[pname]
 
     # acquire lock for HTTP handler
-    def lock(self):
+    def lock(self) -> None:
         _allwebh.lockHandler()
         if "loghost_new" in logger_config.daemon:
             _newwebh.lockHandler()
 
     # release lock
-    def release(self):
+    def release(self) -> None:
         _allwebh.releaseHandler()
         if "loghost_new" in logger_config.daemon:
             _newwebh.releaseHandler()
 
     # rollover
     @staticmethod
-    def doRollOver():
+    def doRollOver() -> None:
         global rotateLog
         rotateLog = True
