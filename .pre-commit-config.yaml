@@ -8,7 +8,7 @@ repos:
 # The rules and the line length live in [tool.ruff] in pyproject.toml, so --isolated is
 # deliberately absent here.
 -   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.6
+    rev: v0.16.9
     hooks:
     # The whole tree, not just the staged files: the scan takes hundredths of a second,
     # and a name can be broken by an edit somewhere else -- a renamed import, a deleted
