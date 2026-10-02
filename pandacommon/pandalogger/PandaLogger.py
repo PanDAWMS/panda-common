@@ -272,6 +272,8 @@ class PandaLogger:
         # every branch below makes a FileHandler of some kind
         txt_handler: logging.FileHandler
         log_h, new_log_flag = getLoggerWrapper("panda.log.%s" % log_name, True)
+        if not new_log_flag:
+            return log_h
         log_h.propagate = False
         tmp_attr = "rotating_policy"
 
