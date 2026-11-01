@@ -41,6 +41,6 @@ repos:
     -   id: mypy
         args: []
         additional_dependencies:
-        -   types-requests==2.33.0.20260906
+        -   types-requests==2.33.0.20261006
         -   types-pytz==2026.4.0.20260926
         pass_filenames: false
