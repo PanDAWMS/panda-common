@@ -38,7 +38,7 @@ rotating_backup_count=1
 # Effective only when rotating_policy=size
 rotating_max_size=1024
 
-# Ratation interval in hour.
+# Rotation interval in hour.
 # Effective only when rotating_policy=time
 rotating_interval=24
 
