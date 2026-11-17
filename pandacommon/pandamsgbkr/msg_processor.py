@@ -517,13 +517,28 @@ class MsgProcAgentBase(GenericThread):
             # skip if not enabled
             if not pconf.get("enable", True):
                 continue
-            # queues
+            # queues: in_queue_list/out_queue_list (plural) opt a processor into
+            # MultiMsgProcThread, which can fan a single in_queue out to several
+            # out_queues (or consume several in_queues) - the singular in_queue/
+            # out_queue keys below keep every existing processor config on the
+            # original SimpleMsgProcThread path, unchanged.
             in_queue = pconf.get("in_queue")
             out_queue = pconf.get("out_queue")
-            if in_queue:
-                in_q_set.add(in_queue)
-            if out_queue:
-                out_q_set.add(out_queue)
+            in_queue_list = pconf.get("in_queue_list")
+            out_queue_list = pconf.get("out_queue_list")
+            is_multi = in_queue_list is not None or out_queue_list is not None
+            if is_multi:
+                in_queue_list = in_queue_list or []
+                out_queue_list = out_queue_list or []
+                for q in in_queue_list:
+                    in_q_set.add(q)
+                for q in out_queue_list:
+                    out_q_set.add(q)
+            else:
+                if in_queue:
+                    in_q_set.add(in_queue)
+                if out_queue:
+                    out_q_set.add(out_queue)
             # n_threads of processors
             n_threads = pconf.get("n_threads", 1)
             # plugin: one instance for each thread
@@ -538,8 +553,13 @@ class MsgProcAgentBase(GenericThread):
             # fill in thread attribute dict
             processor_attr_map[proc] = {}
             processor_attr_map[proc]["n_threads"] = n_threads
-            processor_attr_map[proc]["in_queue"] = in_queue
-            processor_attr_map[proc]["out_queue"] = out_queue
+            processor_attr_map[proc]["is_multi"] = is_multi
+            if is_multi:
+                processor_attr_map[proc]["in_queue_list"] = in_queue_list
+                processor_attr_map[proc]["out_queue_list"] = out_queue_list
+            else:
+                processor_attr_map[proc]["in_queue"] = in_queue
+                processor_attr_map[proc]["out_queue"] = out_queue
             processor_attr_map[proc]["plugin_class_name"] = plugin_class_name
         # mb_listener_proxy instances
         mb_listener_proxy_dict = {}
@@ -561,6 +581,22 @@ class MsgProcAgentBase(GenericThread):
             mb_sender_proxy_dict[out_queue] = mb_sender_proxy
         # keep filling in thread attribute dict
         for proc in processor_attr_map.keys():
+            if processor_attr_map[proc]["is_multi"]:
+                mb_listener_proxy_list = []
+                for in_queue in processor_attr_map[proc]["in_queue_list"]:
+                    if in_queue in mb_listener_proxy_dict:
+                        mb_listener_proxy_list.append(mb_listener_proxy_dict[in_queue])
+                    else:
+                        tmp_logger.warning(f"processor {proc} input queue {in_queue} is missing or disabled. Skip attaching listener")
+                processor_attr_map[proc]["mb_listener_proxy_list"] = mb_listener_proxy_list
+                mb_sender_proxy_list = []
+                for out_queue in processor_attr_map[proc]["out_queue_list"]:
+                    if out_queue in mb_sender_proxy_dict:
+                        mb_sender_proxy_list.append(mb_sender_proxy_dict[out_queue])
+                    else:
+                        tmp_logger.warning(f"processor {proc} output queue {out_queue} is missing or disabled. Skip attaching sender")
+                processor_attr_map[proc]["mb_sender_proxy_list"] = mb_sender_proxy_list
+                continue
             in_queue = processor_attr_map[proc]["in_queue"]
             if in_queue:
                 if in_queue in mb_listener_proxy_dict:
@@ -695,17 +731,20 @@ class MsgProcAgentBase(GenericThread):
                 processor_name, thread_j = processor_id
                 attr_dict = self.processor_attr_map[processor_name]
                 plugin = self.processor_instance_map[processor_id]
-                self.processor_thread_map[processor_id] = SimpleMsgProcThread(
+                thread_cls = MultiMsgProcThread if attr_dict.get("is_multi") else SimpleMsgProcThread
+                self.processor_thread_map[processor_id] = thread_cls(
                     plugin, attr_dict, sleep_time_min=self.process_sleep_time_min, sleep_time_max=self.process_sleep_time_max, thread_j=thread_j
                 )
                 mc_thread = self.processor_thread_map[processor_id]
                 mc_thread.start()
                 tmp_logger.info(
-                    f"spawned processor thread {processor_id} ({mc_thread.__class__.__name__}) with plugin={attr_dict['plugin_class_name']} , in_q={attr_dict.get('in_queue')}, out_q={attr_dict.get('out_queue')}"
+                    f"spawned processor thread {processor_id} ({mc_thread.__class__.__name__}) with plugin={attr_dict['plugin_class_name']} , "
+                    f"in_q={attr_dict.get('in_queue') or attr_dict.get('in_queue_list')}, out_q={attr_dict.get('out_queue') or attr_dict.get('out_queue_list')}"
                 )
             except Exception as e:
                 tmp_logger.error(
-                    f"failed to spawn processor thread {processor_id} with plugin={attr_dict.get('plugin_class_name')} , in_q={attr_dict.get('in_queue')}, out_q={attr_dict.get('out_queue')} ; {e.__class__.__name__}: {e} "
+                    f"failed to spawn processor thread {processor_id} with plugin={attr_dict.get('plugin_class_name')} , "
+                    f"in_q={attr_dict.get('in_queue') or attr_dict.get('in_queue_list')}, out_q={attr_dict.get('out_queue') or attr_dict.get('out_queue_list')} ; {e.__class__.__name__}: {e} "
                 )
         tmp_logger.debug("done")
 
